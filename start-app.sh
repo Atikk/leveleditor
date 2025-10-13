@@ -20,8 +20,8 @@ fluxbox &
 # Wait a bit for WM to start
 sleep 1
 
-# Start the application in background
-cd /home/runner/workspace/src/DotGameCSharp
+# Start the Avalonia demo application in background
+cd /home/runner/workspace/avalonia-demo/DotGameAvalonia
 dotnet run &
 APP_PID=$!
 

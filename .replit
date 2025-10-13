@@ -4,7 +4,7 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["tigervnc", "xorg.xorgserver", "fluxbox", "xterm", "novnc", "xvfb-run", "libgdiplus", "xorg.xinit"]
+packages = ["tigervnc", "xorg.xorgserver", "fluxbox", "xterm", "novnc", "xvfb-run", "libgdiplus", "xorg.xinit", "samba4Full", "wget", "fontconfig", "xorg.libICE", "xorg.libSM"]
 
 [workflows]
 runButton = "Project"
@@ -33,3 +33,7 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 36767
+externalPort = 3000

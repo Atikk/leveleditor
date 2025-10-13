@@ -1,0 +1,15 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="DotGameAvalonia.MainWindow"
+        Title="DotGame - Running on Linux!"
+        Width="400" Height="300">
+    
+    <StackPanel Margin="20" Spacing="10">
+        <TextBlock Text="✅ SUCCESS!" FontSize="32" FontWeight="Bold" HorizontalAlignment="Center"/>
+        <TextBlock Text="Avalonia UI is working on Linux!" FontSize="16" HorizontalAlignment="Center"/>
+        <TextBlock Text="This proves cross-platform .NET UI works in Replit!" 
+                   TextWrapping="Wrap" HorizontalAlignment="Center" Margin="0,20,0,0"/>
+        <Button Content="Click Me!" HorizontalAlignment="Center" Click="OnButtonClick" Padding="20,10"/>
+        <TextBlock Name="ResultText" FontSize="14" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+    </StackPanel>
+</Window>
