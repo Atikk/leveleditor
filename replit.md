@@ -66,6 +66,28 @@ Maps are saved as JSON files containing:
 - Converted to standard C# project structure
 - Requires Windows or Windows compatibility layer to run
 
+## Setup on Replit
+
+The project has been set up with:
+- Standard C# project structure (converted from LINQPad .linq files)
+- VNC/X11 environment (Xvnc, noVNC on port 5000, Fluxbox window manager)
+- Workflow configured to start VNC server automatically
+
+However, the application **cannot run on Linux** due to the Windows-only runtime requirement.
+
+## How to Use This Project
+
+### On Windows
+```bash
+cd src/DotGameCSharp
+dotnet run
+```
+
+### On Replit/Linux
+The app needs to be ported to a cross-platform framework first. See README.md for migration options.
+
 ## Recent Changes
-- 2025-10-13: Converted from LINQPad format to standard C# project
-- 2025-10-13: Set up VNC/X11 environment for Replit (limited functionality)
+- 2025-10-13: Imported from GitHub and converted from LINQPad format
+- 2025-10-13: Set up C# project structure with .NET 7.0
+- 2025-10-13: Configured VNC/X11 environment
+- 2025-10-13: Added comprehensive documentation
