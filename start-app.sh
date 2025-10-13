@@ -1,41 +1,38 @@
 #!/bin/bash
 
-# Kill any existing VNC servers
-vncserver -kill :0 2>/dev/null || true
-vncserver -kill :1 2>/dev/null || true
+# Kill any existing servers
+killall Xvnc 2>/dev/null || true
+killall python3 2>/dev/null || true
 
-# Set up VNC password
-mkdir -p ~/.vnc
-echo "replit" | vncpasswd -f > ~/.vnc/passwd
-chmod 600 ~/.vnc/passwd
+# Start Xvnc directly without vncserver wrapper
+Xvnc :0 -geometry 1280x720 -depth 24 -rfbport 5900 -SecurityTypes None -AlwaysShared &
+XVNC_PID=$!
 
-# Create xstartup script for VNC
-cat > ~/.vnc/xstartup << 'XEOF'
-#!/bin/bash
-unset SESSION_MANAGER
-unset DBUS_SESSION_BUS_ADDRESS
-export DISPLAY=:0
-fluxbox &
-xterm -e "echo 'VNC Desktop Ready. DotGame will start automatically.'; sleep 2" &
+# Wait for Xvnc to start
 sleep 2
-cd /home/runner/workspace/src/DotGameCSharp
-dotnet run
-XEOF
-chmod +x ~/.vnc/xstartup
 
-# Start VNC server
-vncserver :0 -geometry 1280x720 -depth 24 -localhost no
+# Set DISPLAY
+export DISPLAY=:0
+
+# Start window manager
+fluxbox &
+
+# Wait a bit for WM to start
+sleep 1
+
+# Start the application in background
+cd /home/runner/workspace/src/DotGameCSharp
+dotnet run &
+APP_PID=$!
 
 # Start noVNC web interface on port 5000
 echo "Starting noVNC on port 5000..."
 /nix/store/n7h60i6lqysmya4clas5vghfsjc6sspa-novnc-1.6.0/bin/novnc --listen 5000 --vnc localhost:5900 &
+NOVNC_PID=$!
 
-# Wait for services to start
-sleep 3
-
-echo "VNC Server started on display :0 (port 5900)"
+echo "Xvnc started (PID: $XVNC_PID)"
+echo "DotGame started (PID: $APP_PID)"
 echo "noVNC web interface available at http://0.0.0.0:5000"
-echo "VNC password: replit"
 
-# Keep the script running and show VNC logs
-tail -f ~/.vnc/*.log
+# Wait for noVNC process
+wait $NOVNC_PID

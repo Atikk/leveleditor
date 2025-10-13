@@ -4,4 +4,36 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["tigervnc", "xorg.xorgserver", "fluxbox", "xterm", "novnc", "xvfb-run", "libgdiplus"]
+packages = ["tigervnc", "xorg.xorgserver", "fluxbox", "xterm", "novnc", "xvfb-run", "libgdiplus", "xorg.xinit"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "DotGame"
+
+[[workflows.workflow]]
+name = "DotGame"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "./start-app.sh"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 40729
+externalPort = 3000
