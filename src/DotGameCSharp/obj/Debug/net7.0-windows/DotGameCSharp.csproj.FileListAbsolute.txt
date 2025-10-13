@@ -1,0 +1,14 @@
+/home/runner/workspace/src/DotGameCSharp/bin/Debug/net7.0-windows/DotGameCSharp
+/home/runner/workspace/src/DotGameCSharp/bin/Debug/net7.0-windows/DotGameCSharp.deps.json
+/home/runner/workspace/src/DotGameCSharp/bin/Debug/net7.0-windows/DotGameCSharp.runtimeconfig.json
+/home/runner/workspace/src/DotGameCSharp/bin/Debug/net7.0-windows/DotGameCSharp.dll
+/home/runner/workspace/src/DotGameCSharp/bin/Debug/net7.0-windows/DotGameCSharp.pdb
+/home/runner/workspace/src/DotGameCSharp/obj/Debug/net7.0-windows/DotGameCSharp.GeneratedMSBuildEditorConfig.editorconfig
+/home/runner/workspace/src/DotGameCSharp/obj/Debug/net7.0-windows/DotGameCSharp.AssemblyInfoInputs.cache
+/home/runner/workspace/src/DotGameCSharp/obj/Debug/net7.0-windows/DotGameCSharp.AssemblyInfo.cs
+/home/runner/workspace/src/DotGameCSharp/obj/Debug/net7.0-windows/DotGameCSharp.csproj.CoreCompileInputs.cache
+/home/runner/workspace/src/DotGameCSharp/obj/Debug/net7.0-windows/DotGameCSharp.dll
+/home/runner/workspace/src/DotGameCSharp/obj/Debug/net7.0-windows/refint/DotGameCSharp.dll
+/home/runner/workspace/src/DotGameCSharp/obj/Debug/net7.0-windows/DotGameCSharp.pdb
+/home/runner/workspace/src/DotGameCSharp/obj/Debug/net7.0-windows/DotGameCSharp.genruntimeconfig.cache
+/home/runner/workspace/src/DotGameCSharp/obj/Debug/net7.0-windows/ref/DotGameCSharp.dll
