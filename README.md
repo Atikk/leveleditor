@@ -2,45 +2,40 @@
 
 A C# desktop application for creating and playing tile-based games with a visual map editor.
 
-## ⚠️ Important: Platform Compatibility
+## ✅ Cross-Platform Success!
 
-This application was originally designed for **Windows** using Windows Forms. While it compiles successfully on Linux, **it cannot run on Linux/Replit** because it requires the `Microsoft.WindowsDesktop.App` framework, which is Windows-only.
+This application was originally designed for **Windows** using Windows Forms. The Windows Forms version is preserved in `src/DotGameCSharp/` and works perfectly on Windows systems.
+
+**For Replit/Linux**, we've created a **working Avalonia UI demo** that proves cross-platform .NET UI is fully functional!
 
 ### Current Status in Replit
 
 ✅ **What Works:**
-- Project compiles successfully
-- All source code is properly structured
-- VNC/X11 environment is set up
+- Avalonia UI demo app running successfully on Linux
+- VNC/noVNC environment configured (accessible via webview)
+- Cross-platform .NET runtime working perfectly
+- All required Linux dependencies installed
 
-❌ **What Doesn't Work:**
-- Application cannot run (requires Windows runtime)
-- Windows Forms UI is not supported on Linux
+📂 **Demo Location:** `avalonia-demo/DotGameAvalonia/`
 
-## Running This Project
+### Running This Project
 
-### Option 1: Run on Windows (Recommended)
-The application works perfectly on Windows:
+#### Option 1: Run Avalonia Demo (Currently Working!)
+The Avalonia demo is already running and accessible through the webview:
+```bash
+./start-app.sh
+```
+This starts the VNC server and the Avalonia app automatically.
+
+#### Option 2: Run Original Windows Version
+On Windows systems, the original Windows Forms app works perfectly:
 ```bash
 cd src/DotGameCSharp
 dotnet run
 ```
 
-### Option 2: Port to Cross-Platform Framework
-To run on Linux/Mac/Replit, the application needs to be ported to a cross-platform UI framework:
-
-**Recommended Framework: Avalonia UI**
-- Modern, cross-platform .NET UI framework
-- Similar to Windows Forms/WPF
-- Works on Windows, Linux, macOS, and web
-
-**Alternative: ASP.NET Blazor**
-- Convert to a web application
-- Accessible from any browser
-- No desktop UI required
-
-### Option 3: Run on Replit (Requires Porting)
-The VNC environment is already set up. After porting to Avalonia or another compatible framework, the app will display through the noVNC web interface.
+#### Option 3: Port Game Logic to Avalonia
+The original game logic (`Map.cs`, `Character.cs`, `GameForm.cs`) can be ported to the working Avalonia framework. The Avalonia demo proves the environment is ready!
 
 ## Project Features
 
@@ -103,34 +98,36 @@ Maps are saved as JSON files with embedded base64-encoded PNG images:
 
 ## Technical Details
 
+### Original Windows Version (`src/DotGameCSharp/`)
 - **Framework**: .NET 7.0
 - **UI**: Windows Forms (Windows-only)
 - **Language**: C# 11
 - **Graphics**: System.Drawing
 
-## Next Steps for Cross-Platform Support
+### Cross-Platform Avalonia Demo (`avalonia-demo/DotGameAvalonia/`)
+- **Framework**: .NET 7.0
+- **UI**: Avalonia UI (cross-platform)
+- **Language**: C# 11
+- **Display**: VNC/noVNC on Linux, native on Windows/macOS
 
-If you want to run this in Replit, here's what needs to be done:
+## Next Steps: Port Game Logic to Avalonia
 
-1. **Install Avalonia Templates**
-   ```bash
-   dotnet new install Avalonia.Templates
-   ```
+The Avalonia framework is already working! To create the full game in Avalonia:
 
-2. **Create New Avalonia Project**
-   ```bash
-   dotnet new avalonia.app -n DotGameAvalonia
-   ```
+1. **Copy Game Logic from Original**
+   - `Map.cs` - Can be reused with minimal changes
+   - `Character.cs` - Can be reused with minimal changes
+   - Game mechanics are framework-independent
 
-3. **Port UI Components**
-   - Migrate Forms → Avalonia Windows/Views
-   - Convert Controls → Avalonia controls
-   - Adapt painting logic to Avalonia rendering
+2. **Adapt UI Components**
+   - Convert Windows Forms controls → Avalonia controls
+   - Migrate painting/rendering logic to Avalonia's rendering system
+   - Update event handlers for Avalonia's event model
 
-4. **Reuse Game Logic**
-   - Map.cs can be reused as-is
-   - Character.cs needs minor updates
-   - Game logic is mostly framework-independent
+3. **Leverage Working Infrastructure**
+   - VNC/noVNC environment already configured
+   - All Linux dependencies installed
+   - Workflow ready to run the app
 
 ## Original Source
 
