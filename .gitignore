@@ -46,3 +46,9 @@ bld/
 .cache/
 .local/
 .config/
+
+# Avalonia
+DotGame/bin/
+DotGame/obj/
+*.user
+*.suo
