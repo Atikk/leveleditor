@@ -48,10 +48,9 @@ namespace DotGameAvalonia.Views
 
         private async void BtnTestMap_Click(object? sender, RoutedEventArgs e)
         {
-            var mapSelector = new MapSelectorWindow();
-            var selectedMap = await mapSelector.ShowDialog<string?>(this);
+            string selectedMap = "/home/runner/workspace/maps/sample.json";
             
-            if (!string.IsNullOrEmpty(selectedMap) && File.Exists(selectedMap))
+            if (File.Exists(selectedMap))
             {
                 var charDialog = new CharacterCreationWindow();
                 var dialogResult = await charDialog.ShowDialog<bool>(this);
