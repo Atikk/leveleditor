@@ -14,14 +14,18 @@ sleep 2
 # Set DISPLAY
 export DISPLAY=:0
 
+# Start DBus for Avalonia file dialogs
+eval $(dbus-launch --sh-syntax)
+export DBUS_SESSION_BUS_ADDRESS
+
 # Start window manager
 fluxbox &
 
 # Wait a bit for WM to start
 sleep 1
 
-# Start the Avalonia demo application in background
-cd /home/runner/workspace/avalonia-demo/DotGameAvalonia
+# Start the DotGame Avalonia application in background
+cd /home/runner/workspace/DotGame
 nohup dotnet run > /tmp/dotgame-app.log 2>&1 &
 APP_PID=$!
 sleep 2

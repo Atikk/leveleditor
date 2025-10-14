@@ -1,0 +1,38 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="DotGameAvalonia.Views.CharacterCreationWindow"
+        Title="Create or Choose Character"
+        Width="400" Height="500"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    
+    <StackPanel Margin="20" Spacing="10">
+        <TextBlock Text="Sprite Path (optional):" FontWeight="Bold" />
+        <TextBox Name="TxtSpritePath" Watermark="Enter path to sprite image (leave blank for default)" />
+        <Button Name="BtnLoadSprite" Content="Load Sprite from Path" Height="30" />
+        
+        <Border BorderBrush="Gray" BorderThickness="1" Height="120">
+            <Image Name="ImgPreview" Stretch="Uniform" />
+        </Border>
+        
+        <TextBlock Text="Name:" FontWeight="Bold" />
+        <TextBox Name="TxtName" Watermark="Enter character name" />
+        
+        <TextBlock Text="Class:" FontWeight="Bold" />
+        <ComboBox Name="CmbClass" SelectedIndex="0">
+            <ComboBoxItem>Warrior</ComboBoxItem>
+            <ComboBoxItem>Mage</ComboBoxItem>
+            <ComboBoxItem>Thief</ComboBoxItem>
+        </ComboBox>
+        
+        <Border BorderBrush="Gray" BorderThickness="1" Height="70" Padding="10">
+            <TextBlock Name="LblStats" TextWrapping="Wrap" />
+        </Border>
+        
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,10,0,0">
+            <Button Name="BtnOk" Content="OK" Width="80" Height="35" />
+            <Button Name="BtnCancel" Content="Cancel" Width="80" Height="35" />
+        </StackPanel>
+    </StackPanel>
+    
+</Window>

@@ -1,0 +1,152 @@
+using System;
+using Avalonia;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using SkiaSharp;
+
+namespace DotGameAvalonia.Models
+{
+    public enum Facing { Down, Left, Right, Up }
+    public enum CharacterClass { Warrior, Mage, Thief }
+
+    public struct Stats
+    {
+        public int MaxHP;
+        public int Attack;
+        public int Defense;
+    }
+
+    public sealed class Character
+    {
+        public int TileX { get; private set; }
+        public int TileY { get; private set; }
+
+        public Color Color { get; set; } = Colors.DeepSkyBlue;
+
+        public Bitmap? Sprite { get; set; }
+
+        public int FrameWidth { get; private set; } = 32;
+        public int FrameHeight { get; private set; } = 32;
+        public int TotalFrames { get; private set; } = 1;
+
+        public Facing Direction { get; private set; } = Facing.Down;
+        public int FrameIndex { get; private set; } = 0;
+
+        public CharacterClass Class { get; private set; } = CharacterClass.Warrior;
+
+        public Stats Attributes { get; private set; }
+        
+        public string Name { get; private set; } = "Hero";
+
+        public int AnimationDelay { get; set; } = 5;
+
+        private int animationCounter = 0;
+
+        public Character(int tileX, int tileY)
+        {
+            TileX = tileX;
+            TileY = tileY;
+            Class = CharacterClass.Warrior;
+            Name = "Hero";
+            Attributes = GetBaseStats(Class);
+        }
+
+        public Character(int tileX, int tileY, CharacterClass cls, string name)
+            : this(tileX, tileY)
+        {
+            Class = cls;
+            Name = name;
+            Attributes = GetBaseStats(cls);
+        }
+
+        public static Stats GetBaseStats(CharacterClass cls)
+        {
+            return cls switch
+            {
+                CharacterClass.Warrior => new Stats { MaxHP = 30, Attack = 5, Defense = 5 },
+                CharacterClass.Mage    => new Stats { MaxHP = 20, Attack = 7, Defense = 3 },
+                CharacterClass.Thief   => new Stats { MaxHP = 25, Attack = 6, Defense = 4 },
+                _ => new Stats { MaxHP = 10, Attack = 3, Defense = 3 },
+            };
+        }
+
+        public void LoadSprite(string path, int frameW = 32, int frameH = 32, int totalFrames = 1)
+        {
+            Sprite = new Bitmap(path);
+            FrameWidth = frameW;
+            FrameHeight = frameH;
+            TotalFrames = Math.Max(1, totalFrames);
+        }
+
+        public void Draw(SKCanvas canvas, Map map)
+        {
+            var rect = map.TileRect(TileX, TileY);
+            var skRect = new SKRect((float)rect.X, (float)rect.Y, 
+                                    (float)(rect.X + rect.Width), (float)(rect.Y + rect.Height));
+
+            if (Sprite != null)
+            {
+                using var skSprite = BitmapToSKBitmap(Sprite);
+                var srcRect = new SKRect(FrameIndex * FrameWidth, (int)Direction * FrameHeight, 
+                                         (FrameIndex + 1) * FrameWidth, ((int)Direction + 1) * FrameHeight);
+                canvas.DrawBitmap(skSprite, srcRect, skRect);
+            }
+            else
+            {
+                var paint = new SKPaint { Color = SKColor.Parse(Color.ToString()), Style = SKPaintStyle.Fill };
+                canvas.DrawRect(skRect, paint);
+                
+                var borderPaint = new SKPaint { Color = SKColors.Black, Style = SKPaintStyle.Stroke, StrokeWidth = 2 };
+                canvas.DrawRect(skRect, borderPaint);
+            }
+        }
+
+        private SKBitmap BitmapToSKBitmap(Bitmap bitmap)
+        {
+            using var stream = new System.IO.MemoryStream();
+            bitmap.Save(stream);
+            stream.Position = 0;
+            return SKBitmap.Decode(stream);
+        }
+
+        public void TryMove(int dx, int dy, Map map)
+        {
+            int nx = TileX + dx;
+            int ny = TileY + dy;
+            if (map.InBounds(nx, ny))
+            {
+                TileX = nx;
+                TileY = ny;
+                UpdateDirection(dx, dy);
+                AdvanceFrame();
+            }
+        }
+
+        private void UpdateDirection(int dx, int dy)
+        {
+            if (dy < 0) Direction = Facing.Up;
+            else if (dy > 0) Direction = Facing.Down;
+            else if (dx < 0) Direction = Facing.Left;
+            else if (dx > 0) Direction = Facing.Right;
+        }
+
+        private void AdvanceFrame()
+        {
+            if (TotalFrames > 1)
+                FrameIndex = (FrameIndex + 1) % TotalFrames;
+        }
+
+        public void UpdateAnimation()
+        {
+            if (TotalFrames > 1)
+            {
+                animationCounter++;
+                if (animationCounter >= AnimationDelay)
+                {
+                    AdvanceFrame();
+                    animationCounter = 0;
+                }
+            }
+        }
+    }
+}

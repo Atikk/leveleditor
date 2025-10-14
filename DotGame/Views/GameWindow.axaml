@@ -1,0 +1,11 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="DotGameAvalonia.Views.GameWindow"
+        Title="DotGame – Play Test"
+        Width="800" Height="600"
+        WindowStartupLocation="CenterScreen"
+        Background="Black">
+    
+    <Canvas Name="GameCanvas" Background="Black" />
+    
+</Window>

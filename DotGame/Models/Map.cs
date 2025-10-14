@@ -1,0 +1,108 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
+using Avalonia;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
+using SkiaSharp;
+
+namespace DotGameAvalonia.Models
+{
+    public sealed class Map
+    {
+        public int Cols { get; private set; }
+        public int Rows { get; private set; }
+        public int TileW { get; private set; }
+        public int TileH { get; private set; }
+
+        private string?[,] tiles = default!;
+        private readonly Dictionary<string, SKBitmap> imageCache = new(StringComparer.Ordinal);
+        public WriteableBitmap? Composite { get; private set; }
+
+        private Map() {}
+
+        public static Map LoadFromJson(string path)
+        {
+            var json = File.ReadAllText(path);
+            var obj = JsonSerializer.Deserialize<MapDto>(json, new JsonSerializerOptions {
+                PropertyNameCaseInsensitive = true
+            }) ?? throw new InvalidDataException("Invalid map JSON.");
+
+            if (obj.map is null || obj.cols <= 0 || obj.rows <= 0 || obj.tileW <= 0 || obj.tileH <= 0)
+                throw new InvalidDataException("Map is missing required fields (map/cols/rows/tileW/tileH).");
+
+            var map = new Map
+            {
+                Cols = obj.cols,
+                Rows = obj.rows,
+                TileW = obj.tileW,
+                TileH = obj.tileH,
+                tiles = new string?[obj.rows, obj.cols]
+            };
+
+            for (int y = 0; y < obj.rows; y++)
+            {
+                var row = obj.map[y];
+                for (int x = 0; x < obj.cols; x++)
+                    map.tiles[y, x] = row?[x];
+            }
+
+            map.BuildComposite();
+            return map;
+        }
+
+        public bool InBounds(int tx, int ty) => tx >= 0 && ty >= 0 && tx < Cols && ty < Rows;
+
+        public Rect TileRect(int tx, int ty) => new(tx * TileW, ty * TileH, TileW, TileH);
+
+        public void BuildComposite()
+        {
+            var surface = SKSurface.Create(new SKImageInfo(Cols * TileW, Rows * TileH));
+            var canvas = surface.Canvas;
+            canvas.Clear(SKColors.White);
+
+            for (int y = 0; y < Rows; y++)
+            {
+                for (int x = 0; x < Cols; x++)
+                {
+                    var url = tiles[y, x];
+                    if (!string.IsNullOrEmpty(url))
+                    {
+                        var img = GetOrDecode(url!);
+                        var destRect = SKRect.Create(x * TileW, y * TileH, TileW, TileH);
+                        canvas.DrawBitmap(img, destRect);
+                    }
+                }
+            }
+
+            var image = surface.Snapshot();
+            var data = image.Encode(SKEncodedImageFormat.Png, 100);
+            using var stream = new MemoryStream(data.ToArray());
+            Composite = WriteableBitmap.Decode(stream);
+        }
+
+        private SKBitmap GetOrDecode(string dataUrl)
+        {
+            if (imageCache.TryGetValue(dataUrl, out var cached))
+                return cached;
+
+            var comma = dataUrl.IndexOf(',');
+            var base64 = comma >= 0 ? dataUrl[(comma + 1)..] : dataUrl;
+            var bytes = Convert.FromBase64String(base64);
+
+            var bmp = SKBitmap.Decode(bytes);
+            imageCache[dataUrl] = bmp;
+            return bmp;
+        }
+
+        private sealed class MapDto
+        {
+            public int cols { get; set; }
+            public int rows { get; set; }
+            public int tileW { get; set; }
+            public int tileH { get; set; }
+            public string?[][]? map { get; set; }
+        }
+    }
+}

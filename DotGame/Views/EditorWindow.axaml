@@ -1,0 +1,22 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="DotGameAvalonia.Views.EditorWindow"
+        Title="DotGame Map Editor"
+        Width="1000" Height="700"
+        WindowStartupLocation="CenterScreen">
+    
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        
+        <StackPanel Grid.Row="0" Margin="10" Spacing="10">
+            <TextBlock Text="Map Editor - Coming Soon!" FontSize="18" FontWeight="Bold" />
+            <TextBlock Text="The map editor is currently being ported to Avalonia." TextWrapping="Wrap" />
+            <TextBlock Text="For now, you can use the Windows Forms version on Windows to create maps." TextWrapping="Wrap" />
+            <Button Name="BtnClose" Content="Close" Width="100" HorizontalAlignment="Left" />
+        </StackPanel>
+    </Grid>
+    
+</Window>
