@@ -198,13 +198,19 @@ dotnet run
 - Built with .NET 8.0 for security and modern framework support
 
 ## Recent Changes
-- 2025-10-14: **Complete JRPG System Implementation!**
-  - Enhanced animation system with states (Idle, Walk, Attack, Hit, Death)
-  - Monster/NPC system with AI pathfinding
-  - Turn-based combat with damage calculation
-  - Combat UI with health bars and action buttons
-  - Character stats system (HP, Attack, Defense)
-  - Class descriptions in character creation
+- 2025-10-14: **Complete JRPG System Implementation with All Fixes!**
+  - Enhanced animation system with proper state transitions (Idle, Walk, Attack, Hit, Death)
+  - Fixed animation rendering: All entities use Draw() with currentAnimation.CurrentFrameRect()
+  - Fixed idle transitions: Player and monsters properly switch between Idle/Walk based on movement
+  - Fixed directional animations: All 5 states update correctly when direction changes
+  - Fixed SetAnimation: Always applies updated animations even when state unchanged
+  - Fixed monster AI: DidMoveThisUpdate flag tracks actual movement success
+  - Fixed combat damage: CombatManager calculates and applies correct damage values
+  - Monster/NPC system with AI pathfinding and animations
+  - Turn-based combat with stat-based damage (Attack vs Defense)
+  - Combat UI with health bars, messages, and action buttons
+  - Character stats system (HP, Attack, Defense) with 3 classes
+  - Class descriptions and stat previews in character creation
 - 2025-10-14: **Added full Map Editor and Sprite Editor!**
   - Map Editor: Sprite sheet splitting, tile palette, brush tool, save/load JSON
   - Sprite Editor: Pixel drawing, multi-frame support, color palette, save/load PNG
