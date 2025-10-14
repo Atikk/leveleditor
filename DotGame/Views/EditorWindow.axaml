@@ -2,21 +2,66 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="DotGameAvalonia.Views.EditorWindow"
         Title="DotGame Map Editor"
-        Width="1000" Height="700"
+        Width="1200" Height="800"
         WindowStartupLocation="CenterScreen">
     
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-        
-        <StackPanel Grid.Row="0" Margin="10" Spacing="10">
-            <TextBlock Text="Map Editor - Coming Soon!" FontSize="18" FontWeight="Bold" />
-            <TextBlock Text="The map editor is currently being ported to Avalonia." TextWrapping="Wrap" />
-            <TextBlock Text="For now, you can use the Windows Forms version on Windows to create maps." TextWrapping="Wrap" />
-            <Button Name="BtnClose" Content="Close" Width="100" HorizontalAlignment="Left" />
+    <DockPanel>
+        <!-- Control Panel at Top -->
+        <StackPanel DockPanel.Dock="Top" Background="#F0F0F0" Margin="5">
+            <!-- Row 1: Sprite Sheet Loading -->
+            <StackPanel Orientation="Horizontal" Margin="0,5">
+                <Button Name="BtnLoadSpriteSheet" Content="Load Sprite Sheet" Margin="5,0" Width="130" />
+                <TextBlock Text="Tile W:" VerticalAlignment="Center" Margin="10,0,5,0" />
+                <NumericUpDown Name="NumTileWidth" Minimum="1" Maximum="512" Value="32" Width="70" />
+                <TextBlock Text="Tile H:" VerticalAlignment="Center" Margin="10,0,5,0" />
+                <NumericUpDown Name="NumTileHeight" Minimum="1" Maximum="512" Value="32" Width="70" />
+                <TextBlock Text="Spacing:" VerticalAlignment="Center" Margin="10,0,5,0" />
+                <NumericUpDown Name="NumSpacing" Minimum="0" Maximum="64" Value="0" Width="70" />
+                <TextBlock Text="Margin:" VerticalAlignment="Center" Margin="10,0,5,0" />
+                <NumericUpDown Name="NumMargin" Minimum="0" Maximum="64" Value="0" Width="70" />
+                <Button Name="BtnSplitSheet" Content="Split Sheet" Margin="10,0,5,0" Width="100" />
+            </StackPanel>
+            
+            <!-- Row 2: Tile Loading & Grid Controls -->
+            <StackPanel Orientation="Horizontal" Margin="0,5">
+                <Button Name="BtnLoadTiles" Content="Load Tile Images" Margin="5,0" Width="130" />
+                <TextBlock Text="Brush Size:" VerticalAlignment="Center" Margin="10,0,5,0" />
+                <NumericUpDown Name="NumBrushSize" Minimum="1" Maximum="10" Value="1" Width="70" />
+                <TextBlock Text="Grid Size:" VerticalAlignment="Center" Margin="10,0,5,0" />
+                <ComboBox Name="CmbGridSize" Width="70" SelectedIndex="1">
+                    <ComboBoxItem>10</ComboBoxItem>
+                    <ComboBoxItem>20</ComboBoxItem>
+                    <ComboBoxItem>30</ComboBoxItem>
+                    <ComboBoxItem>40</ComboBoxItem>
+                    <ComboBoxItem>50</ComboBoxItem>
+                </ComboBox>
+                <Button Name="BtnClearGrid" Content="Clear Grid" Margin="10,0,5,0" Width="100" />
+            </StackPanel>
+            
+            <!-- Row 3: Save/Load -->
+            <StackPanel Orientation="Horizontal" Margin="0,5">
+                <Button Name="BtnSaveMap" Content="Save Map" Margin="5,0" Width="130" />
+                <Button Name="BtnLoadMap" Content="Load Map" Margin="5,0" Width="130" />
+                <Button Name="BtnSpriteEditor" Content="Sprite Editor" Margin="10,0,5,0" Width="130" Background="LightBlue" />
+                <TextBlock Text="Select tiles and paint on the grid. Right-click to erase." 
+                          VerticalAlignment="Center" Margin="20,0" Foreground="Gray" />
+            </StackPanel>
         </StackPanel>
-    </Grid>
+        
+        <!-- Tile Palette (Left Side) -->
+        <Border DockPanel.Dock="Left" BorderBrush="Gray" BorderThickness="1" Width="220" Background="White">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <WrapPanel Name="TilePalette" Orientation="Horizontal" Margin="5" />
+            </ScrollViewer>
+        </Border>
+        
+        <!-- Map Canvas (Center) -->
+        <Border BorderBrush="Gray" BorderThickness="1" Background="White">
+            <Canvas Name="MapCanvas" Background="White" 
+                    PointerPressed="MapCanvas_PointerPressed"
+                    PointerMoved="MapCanvas_PointerMoved"
+                    PointerReleased="MapCanvas_PointerReleased" />
+        </Border>
+    </DockPanel>
     
 </Window>

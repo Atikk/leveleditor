@@ -1,0 +1,78 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="DotGameAvalonia.Views.SpriteEditorWindow"
+        Title="DotGame Sprite Editor"
+        Width="1000" Height="700"
+        WindowStartupLocation="CenterScreen">
+    
+    <DockPanel>
+        <!-- Control Panel at Top -->
+        <StackPanel DockPanel.Dock="Top" Background="#F0F0F0" Margin="5">
+            <!-- Row 1: Canvas Size -->
+            <StackPanel Orientation="Horizontal" Margin="0,5">
+                <TextBlock Text="Canvas Width:" VerticalAlignment="Center" Margin="5,0" />
+                <NumericUpDown Name="NumCanvasWidth" Minimum="1" Maximum="512" Value="64" Width="70" />
+                <TextBlock Text="Height:" VerticalAlignment="Center" Margin="10,0,5,0" />
+                <NumericUpDown Name="NumCanvasHeight" Minimum="1" Maximum="512" Value="64" Width="70" />
+                <Button Name="BtnNewCanvas" Content="New Canvas" Margin="10,0,5,0" Width="100" />
+                <TextBlock Text="Zoom:" VerticalAlignment="Center" Margin="20,0,5,0" />
+                <NumericUpDown Name="NumZoom" Minimum="1" Maximum="20" Value="8" Width="70" />
+            </StackPanel>
+            
+            <!-- Row 2: Frame Settings -->
+            <StackPanel Orientation="Horizontal" Margin="0,5">
+                <TextBlock Text="Frame Width:" VerticalAlignment="Center" Margin="5,0" />
+                <NumericUpDown Name="NumFrameWidth" Minimum="1" Maximum="512" Value="32" Width="70" />
+                <TextBlock Text="Height:" VerticalAlignment="Center" Margin="10,0,5,0" />
+                <NumericUpDown Name="NumFrameHeight" Minimum="1" Maximum="512" Value="32" Width="70" />
+                <TextBlock Text="Current Frame:" VerticalAlignment="Center" Margin="20,0,5,0" />
+                <NumericUpDown Name="NumCurrentFrame" Minimum="0" Maximum="99" Value="0" Width="70" />
+                <Button Name="BtnPrevFrame" Content="&lt;" Width="40" Margin="5,0" />
+                <Button Name="BtnNextFrame" Content="&gt;" Width="40" />
+            </StackPanel>
+            
+            <!-- Row 3: Tools and Save -->
+            <StackPanel Orientation="Horizontal" Margin="0,5">
+                <Button Name="BtnClear" Content="Clear Canvas" Margin="5,0" Width="100" />
+                <Button Name="BtnLoadSprite" Content="Load Sprite" Margin="5,0" Width="100" />
+                <Button Name="BtnSaveSprite" Content="Save Sprite" Margin="5,0" Width="100" />
+                <CheckBox Name="ChkShowGrid" Content="Show Grid" Margin="20,0" IsChecked="True" />
+                <TextBlock Text="Draw pixel with left-click, erase with right-click" 
+                          VerticalAlignment="Center" Margin="20,0" Foreground="Gray" />
+            </StackPanel>
+        </StackPanel>
+        
+        <!-- Color Palette (Left Side) -->
+        <Border DockPanel.Dock="Left" BorderBrush="Gray" BorderThickness="1" Width="180" Background="White">
+            <StackPanel Margin="5">
+                <TextBlock Text="Color Palette" FontWeight="Bold" Margin="0,5" />
+                <Border Name="SelectedColorDisplay" Width="150" Height="40" Background="Black" BorderBrush="Gray" BorderThickness="2" Margin="5" />
+                <WrapPanel Name="ColorPalette" Orientation="Horizontal" Margin="0,10,0,0" />
+                <TextBlock Text="Custom Color:" FontWeight="Bold" Margin="0,10,0,5" />
+                <StackPanel Orientation="Horizontal" Margin="0,5">
+                    <TextBlock Text="R:" VerticalAlignment="Center" Margin="2,0" />
+                    <NumericUpDown Name="NumRed" Minimum="0" Maximum="255" Value="0" Width="60" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,5">
+                    <TextBlock Text="G:" VerticalAlignment="Center" Margin="2,0" />
+                    <NumericUpDown Name="NumGreen" Minimum="0" Maximum="255" Value="0" Width="60" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,5">
+                    <TextBlock Text="B:" VerticalAlignment="Center" Margin="2,0" />
+                    <NumericUpDown Name="NumBlue" Minimum="0" Maximum="255" Value="0" Width="60" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+        
+        <!-- Pixel Canvas (Center) -->
+        <Border BorderBrush="Gray" BorderThickness="1" Background="White">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <Canvas Name="PixelCanvas" Background="White" 
+                        PointerPressed="PixelCanvas_PointerPressed"
+                        PointerMoved="PixelCanvas_PointerMoved"
+                        PointerReleased="PixelCanvas_PointerReleased" />
+            </ScrollViewer>
+        </Border>
+    </DockPanel>
+    
+</Window>

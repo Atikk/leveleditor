@@ -8,6 +8,7 @@
     
     <StackPanel Margin="20" Spacing="15">
         <Button Name="BtnEditor" Height="50" Content="Map Editor" FontSize="18" />
+        <Button Name="BtnSpriteEditor" Height="50" Content="Sprite Editor" FontSize="18" />
         <Button Name="BtnTestMap" Height="50" Content="Test Map" FontSize="18" />
         <Button Name="BtnCharCreate" Height="50" Content="Create Character" FontSize="18" />
     </StackPanel>

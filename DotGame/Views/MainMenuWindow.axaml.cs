@@ -17,11 +17,15 @@ namespace DotGameAvalonia.Views
         private void AttachEvents()
         {
             var btnEditor = this.FindControl<Button>("BtnEditor");
+            var btnSpriteEditor = this.FindControl<Button>("BtnSpriteEditor");
             var btnTestMap = this.FindControl<Button>("BtnTestMap");
             var btnCharCreate = this.FindControl<Button>("BtnCharCreate");
 
             if (btnEditor != null)
                 btnEditor.Click += BtnEditor_Click;
+            
+            if (btnSpriteEditor != null)
+                btnSpriteEditor.Click += BtnSpriteEditor_Click;
             
             if (btnTestMap != null)
                 btnTestMap.Click += BtnTestMap_Click;
@@ -34,6 +38,12 @@ namespace DotGameAvalonia.Views
         {
             var editor = new EditorWindow();
             await editor.ShowDialog(this);
+        }
+
+        private async void BtnSpriteEditor_Click(object? sender, RoutedEventArgs e)
+        {
+            var spriteEditor = new SpriteEditorWindow();
+            await spriteEditor.ShowDialog(this);
         }
 
         private async void BtnTestMap_Click(object? sender, RoutedEventArgs e)
