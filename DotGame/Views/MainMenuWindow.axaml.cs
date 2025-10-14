@@ -48,7 +48,7 @@ namespace DotGameAvalonia.Views
 
         private async void BtnTestMap_Click(object? sender, RoutedEventArgs e)
         {
-            string selectedMap = "/home/runner/workspace/maps/sample.json";
+            string selectedMap = "/home/runner/workspace/maps/simple.json";
             
             if (File.Exists(selectedMap))
             {
