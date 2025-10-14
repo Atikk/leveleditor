@@ -6,6 +6,36 @@
         WindowStartupLocation="CenterScreen"
         Background="Black">
     
-    <Canvas Name="GameCanvas" Background="Black" />
+    <Grid>
+        <Canvas Name="GameCanvas" Background="Black" />
+        
+        <Border Name="CombatUI" IsVisible="False" Background="#DD000000" Padding="20"
+                HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,50">
+            <StackPanel Spacing="10" MinWidth="400">
+                <TextBlock Name="TxtCombatMessage" Text="Combat!" Foreground="White" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" />
+                
+                <Grid ColumnDefinitions="*,*">
+                    <StackPanel Grid.Column="0" Spacing="5">
+                        <TextBlock Name="TxtPlayerInfo" Foreground="LightGreen" FontSize="14" />
+                        <ProgressBar Name="BarPlayerHP" Height="20" Minimum="0" Maximum="100" Value="100" Foreground="Green" />
+                    </StackPanel>
+                    
+                    <StackPanel Grid.Column="1" Spacing="5">
+                        <TextBlock Name="TxtEnemyInfo" Foreground="LightCoral" FontSize="14" HorizontalAlignment="Right" />
+                        <ProgressBar Name="BarEnemyHP" Height="20" Minimum="0" Maximum="100" Value="100" Foreground="Red" />
+                    </StackPanel>
+                </Grid>
+                
+                <StackPanel Name="PanelCombatActions" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
+                    <Button Name="BtnAttack" Content="⚔️ Attack" Width="120" Height="40" />
+                    <Button Name="BtnDefend" Content="🛡️ Defend" Width="120" Height="40" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+        
+        <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10" Spacing="5">
+            <TextBlock Name="TxtPlayerStats" Foreground="White" FontSize="14" />
+        </StackPanel>
+    </Grid>
     
 </Window>

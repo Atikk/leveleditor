@@ -18,6 +18,7 @@ namespace DotGameAvalonia.Views
         private TextBox? txtSpritePath;
         private ComboBox? cmbClass;
         private TextBlock? lblStats;
+        private TextBlock? lblClassDesc;
 
         public CharacterCreationWindow()
         {
@@ -33,6 +34,7 @@ namespace DotGameAvalonia.Views
             txtSpritePath = this.FindControl<TextBox>("TxtSpritePath");
             cmbClass = this.FindControl<ComboBox>("CmbClass");
             lblStats = this.FindControl<TextBlock>("LblStats");
+            lblClassDesc = this.FindControl<TextBlock>("LblClassDesc");
             
             var btnLoadSprite = this.FindControl<Button>("BtnLoadSprite");
             var btnOk = this.FindControl<Button>("BtnOk");
@@ -91,7 +93,18 @@ namespace DotGameAvalonia.Views
             {
                 SelectedClass = (CharacterClass)cmbClass.SelectedIndex;
                 var stats = Character.GetBaseStats(SelectedClass);
-                lblStats.Text = $"HP: {stats.MaxHP}\nAttack: {stats.Attack}\nDefense: {stats.Defense}";
+                lblStats.Text = $"HP: {stats.MaxHP} | Attack: {stats.Attack} | Defense: {stats.Defense}";
+
+                if (lblClassDesc != null)
+                {
+                    lblClassDesc.Text = SelectedClass switch
+                    {
+                        CharacterClass.Warrior => "⚔️ A strong fighter with high HP and Defense. Excels in close combat.",
+                        CharacterClass.Mage => "🔮 A powerful spellcaster with high Attack but low Defense. Deals massive damage.",
+                        CharacterClass.Thief => "🗡️ A balanced rogue with moderate stats. Quick and versatile in battle.",
+                        _ => ""
+                    };
+                }
             }
         }
 

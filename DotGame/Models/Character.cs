@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -18,8 +19,8 @@ namespace DotGameAvalonia.Models
 
     public sealed class Character
     {
-        public int TileX { get; private set; }
-        public int TileY { get; private set; }
+        public int TileX { get; set; }
+        public int TileY { get; set; }
 
         public Color Color { get; set; } = Colors.DeepSkyBlue;
 
@@ -29,7 +30,7 @@ namespace DotGameAvalonia.Models
         public int FrameHeight { get; private set; } = 32;
         public int TotalFrames { get; private set; } = 1;
 
-        public Facing Direction { get; private set; } = Facing.Down;
+        public Facing Direction { get; set; } = Facing.Down;
         public int FrameIndex { get; private set; } = 0;
 
         public CharacterClass Class { get; private set; } = CharacterClass.Warrior;
@@ -37,6 +38,13 @@ namespace DotGameAvalonia.Models
         public Stats Attributes { get; private set; }
         
         public string Name { get; private set; } = "Hero";
+
+        public int CurrentHP { get; set; }
+        public bool IsAlive => CurrentHP > 0;
+
+        public Dictionary<AnimationState, SpriteAnimation> Animations { get; set; } = new();
+        public AnimationState CurrentState { get; set; } = AnimationState.Idle;
+        private SpriteAnimation? currentAnimation;
 
         public int AnimationDelay { get; set; } = 5;
 
@@ -49,6 +57,7 @@ namespace DotGameAvalonia.Models
             Class = CharacterClass.Warrior;
             Name = "Hero";
             Attributes = GetBaseStats(Class);
+            CurrentHP = Attributes.MaxHP;
         }
 
         public Character(int tileX, int tileY, CharacterClass cls, string name)
@@ -57,6 +66,7 @@ namespace DotGameAvalonia.Models
             Class = cls;
             Name = name;
             Attributes = GetBaseStats(cls);
+            CurrentHP = Attributes.MaxHP;
         }
 
         public static Stats GetBaseStats(CharacterClass cls)
@@ -76,6 +86,24 @@ namespace DotGameAvalonia.Models
             FrameWidth = frameW;
             FrameHeight = frameH;
             TotalFrames = Math.Max(1, totalFrames);
+            InitializeAnimations();
+        }
+
+        public void InitializeAnimations(int frameWidth = 32, int frameHeight = 32, int walkFrames = 3)
+        {
+            if (Sprite == null) return;
+
+            FrameWidth = frameWidth;
+            FrameHeight = frameHeight;
+            TotalFrames = walkFrames;
+
+            Animations[AnimationState.Idle] = new SpriteAnimation(Sprite, 1, FrameWidth, FrameHeight, (int)Direction, true);
+            Animations[AnimationState.Walk] = new SpriteAnimation(Sprite, TotalFrames, FrameWidth, FrameHeight, (int)Direction, true);
+            Animations[AnimationState.Attack] = new SpriteAnimation(Sprite, 1, FrameWidth, FrameHeight, (int)Direction, false);
+            Animations[AnimationState.Hit] = new SpriteAnimation(Sprite, 1, FrameWidth, FrameHeight, (int)Direction, false);
+            Animations[AnimationState.Death] = new SpriteAnimation(Sprite, 1, FrameWidth, FrameHeight, (int)Direction, false);
+            
+            SetAnimation(AnimationState.Idle);
         }
 
         public void Draw(SKCanvas canvas, Map map)
@@ -84,7 +112,13 @@ namespace DotGameAvalonia.Models
             var skRect = new SKRect((float)rect.X, (float)rect.Y, 
                                     (float)(rect.X + rect.Width), (float)(rect.Y + rect.Height));
 
-            if (Sprite != null)
+            if (Sprite != null && currentAnimation != null)
+            {
+                using var skSprite = BitmapToSKBitmap(Sprite);
+                var srcRect = currentAnimation.CurrentFrameRect();
+                canvas.DrawBitmap(skSprite, srcRect, skRect);
+            }
+            else if (Sprite != null)
             {
                 using var skSprite = BitmapToSKBitmap(Sprite);
                 var srcRect = new SKRect(FrameIndex * FrameWidth, (int)Direction * FrameHeight, 
@@ -118,6 +152,10 @@ namespace DotGameAvalonia.Models
                 TileX = nx;
                 TileY = ny;
                 UpdateDirection(dx, dy);
+                if (currentAnimation != null)
+                {
+                    SetAnimation(AnimationState.Walk);
+                }
                 AdvanceFrame();
             }
         }
@@ -128,6 +166,17 @@ namespace DotGameAvalonia.Models
             else if (dy > 0) Direction = Facing.Down;
             else if (dx < 0) Direction = Facing.Left;
             else if (dx > 0) Direction = Facing.Right;
+            
+            if (Sprite != null && Animations.Count > 0)
+            {
+                var previousState = CurrentState;
+                Animations[AnimationState.Idle] = new SpriteAnimation(Sprite, 1, FrameWidth, FrameHeight, (int)Direction, true);
+                Animations[AnimationState.Walk] = new SpriteAnimation(Sprite, TotalFrames, FrameWidth, FrameHeight, (int)Direction, true);
+                Animations[AnimationState.Attack] = new SpriteAnimation(Sprite, 1, FrameWidth, FrameHeight, (int)Direction, false);
+                Animations[AnimationState.Hit] = new SpriteAnimation(Sprite, 1, FrameWidth, FrameHeight, (int)Direction, false);
+                Animations[AnimationState.Death] = new SpriteAnimation(Sprite, 1, FrameWidth, FrameHeight, (int)Direction, false);
+                SetAnimation(previousState);
+            }
         }
 
         private void AdvanceFrame()
@@ -136,9 +185,36 @@ namespace DotGameAvalonia.Models
                 FrameIndex = (FrameIndex + 1) % TotalFrames;
         }
 
+        public void SetAnimation(AnimationState state)
+        {
+            if (Animations.ContainsKey(state))
+            {
+                if (CurrentState != state)
+                {
+                    CurrentState = state;
+                }
+                currentAnimation = Animations[state];
+                currentAnimation.Reset();
+            }
+        }
+
         public void UpdateAnimation()
         {
-            if (TotalFrames > 1)
+            if (currentAnimation != null)
+            {
+                animationCounter++;
+                if (animationCounter >= AnimationDelay)
+                {
+                    currentAnimation.Advance();
+                    animationCounter = 0;
+
+                    if (currentAnimation.IsFinished && CurrentState == AnimationState.Attack)
+                    {
+                        SetAnimation(AnimationState.Idle);
+                    }
+                }
+            }
+            else if (TotalFrames > 1)
             {
                 animationCounter++;
                 if (animationCounter >= AnimationDelay)
@@ -147,6 +223,26 @@ namespace DotGameAvalonia.Models
                     animationCounter = 0;
                 }
             }
+        }
+
+        public int TakeDamage(int damage)
+        {
+            int actualDamage = Math.Max(1, damage);
+            CurrentHP = Math.Max(0, CurrentHP - actualDamage);
+            SetAnimation(AnimationState.Hit);
+            
+            if (CurrentHP <= 0)
+            {
+                SetAnimation(AnimationState.Death);
+            }
+            
+            return actualDamage;
+        }
+
+        public int AttackTarget(Monster target)
+        {
+            SetAnimation(AnimationState.Attack);
+            return target.TakeDamage(Attributes.Attack);
         }
     }
 }
