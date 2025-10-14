@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DotGameCSharp")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1144ea1b4ff5bf0e7a09f90a1338ca7e6951a39e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
 [assembly: System.Reflection.AssemblyProductAttribute("DotGameCSharp")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DotGameCSharp")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
