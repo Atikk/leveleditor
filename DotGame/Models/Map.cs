@@ -79,7 +79,13 @@ namespace DotGameAvalonia.Models
             var image = surface.Snapshot();
             var data = image.Encode(SKEncodedImageFormat.Png, 100);
             using var stream = new MemoryStream(data.ToArray());
+            stream.Position = 0;
             Composite = WriteableBitmap.Decode(stream);
+            
+            if (Composite == null)
+            {
+                throw new InvalidDataException("Failed to create map composite bitmap.");
+            }
         }
 
         private SKBitmap GetOrDecode(string dataUrl)
@@ -92,6 +98,11 @@ namespace DotGameAvalonia.Models
             var bytes = Convert.FromBase64String(base64);
 
             var bmp = SKBitmap.Decode(bytes);
+            if (bmp == null)
+            {
+                throw new InvalidDataException("Failed to decode tile image data. The image data may be corrupted.");
+            }
+            
             imageCache[dataUrl] = bmp;
             return bmp;
         }
