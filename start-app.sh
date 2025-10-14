@@ -22,8 +22,9 @@ sleep 1
 
 # Start the Avalonia demo application in background
 cd /home/runner/workspace/avalonia-demo/DotGameAvalonia
-dotnet run &
+nohup dotnet run > /tmp/dotgame-app.log 2>&1 &
 APP_PID=$!
+sleep 2
 
 # Start noVNC web interface on port 5000
 echo "Starting noVNC on port 5000..."
