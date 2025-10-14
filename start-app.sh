@@ -27,7 +27,8 @@ APP_PID=$!
 
 # Start noVNC web interface on port 5000
 echo "Starting noVNC on port 5000..."
-/nix/store/n7h60i6lqysmya4clas5vghfsjc6sspa-novnc-1.6.0/bin/novnc --listen 5000 --vnc localhost:5900 &
+cd /home/runner/workspace/webroot
+/nix/store/vhjcb946r4swhvrfilwwhlainwd2izki-python3.12-websockify-0.13.0/bin/websockify --web . 5000 localhost:5900 &
 NOVNC_PID=$!
 
 echo "Xvnc started (PID: $XVNC_PID)"
