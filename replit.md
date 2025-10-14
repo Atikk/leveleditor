@@ -58,7 +58,7 @@ Maps are saved as JSON files containing:
 - 2D array of base64-encoded PNG images
 
 ## Development Notes
-- Built with .NET 7.0
+- Built with .NET 8.0 (Avalonia) and .NET 7.0 (Windows Forms)
 - Originally LINQPad scripts (.linq files)
 - Converted to standard C# project structure
 - Windows Forms version preserved for Windows users
@@ -87,4 +87,5 @@ dotnet run
 - 2025-10-13: Successfully implemented Avalonia UI as cross-platform solution
 - 2025-10-13: Installed all required Linux dependencies (fontconfig, libICE, libSM, X11 libraries)
 - 2025-10-13: Verified Avalonia demo app running successfully on Linux
+- 2025-10-13: Upgraded Avalonia project to .NET 8.0 for security updates
 - 2025-10-13: Added comprehensive documentation

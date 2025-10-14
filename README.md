@@ -105,7 +105,7 @@ Maps are saved as JSON files with embedded base64-encoded PNG images:
 - **Graphics**: System.Drawing
 
 ### Cross-Platform Avalonia Demo (`avalonia-demo/DotGameAvalonia/`)
-- **Framework**: .NET 7.0
+- **Framework**: .NET 8.0
 - **UI**: Avalonia UI (cross-platform)
 - **Language**: C# 11
 - **Display**: VNC/noVNC on Linux, native on Windows/macOS
