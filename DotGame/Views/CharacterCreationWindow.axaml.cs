@@ -1,10 +1,14 @@
 using System;
 using System.IO;
+using System.Collections.Generic;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
+using Avalonia.Media;
+using Avalonia;
 using DotGameAvalonia.Models;
 using DotGameAvalonia.Assets;
+using Avalonia.Platform.Storage;
 
 namespace DotGameAvalonia.Views
 {
@@ -72,65 +76,56 @@ namespace DotGameAvalonia.Views
 
             if (btnAddToMap != null)
                 btnAddToMap.Click += BtnAddToMap_Click;
+
+            if (txtName != null)
+                txtName.TextChanged += TxtName_TextChanged;
         }
 
-        private void BtnLoadSprite_Click(object? sender, RoutedEventArgs e)
+        private void TxtName_TextChanged(object? sender, EventArgs e)
         {
-            if (txtSpritePath != null && !string.IsNullOrWhiteSpace(txtSpritePath.Text))
+            if (txtName != null)
+                SelectedName = txtName.Text;
+        }
+
+        private async void BtnLoadSprite_Click(object? sender, RoutedEventArgs e)
+        {
+            var storageProvider = this.StorageProvider;
+            var result = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
-                var path = txtSpritePath.Text;
-
-                if (!Path.IsPathRooted(path))
+                Title = "Select a Sprite File",
+                FileTypeFilter = new[]
                 {
-                    path = Path.Combine("/home/runner/workspace", path);
-                }
-
-                if (File.Exists(path))
-                {
-                    try
+                    new FilePickerFileType("Image Files")
                     {
-                        SelectedSprite = new Bitmap(path);
-                        if (imgPreview != null)
-                            imgPreview.Source = SelectedSprite;
+                        Patterns = new[] { "*.png", "*.jpg", "*.jpeg", "*.bmp" }
                     }
-                    catch (Exception ex)
-                    {
-                        SelectedSprite = null;
-                        if (imgPreview != null)
-                            imgPreview.Source = null;
+                },
+                AllowMultiple = false
+            });
 
-                        // Display error message for unsupported formats or loading issues
-                        var errorWindow = new Window
-                        {
-                            Content = new TextBlock { Text = $"Failed to load sprite: {ex.Message}" },
-                            Width = 300,
-                            Height = 100
-                        };
-                        errorWindow.ShowDialog(this);
-                    }
-                }
-                else
+            if (result.Count > 0)
+            {
+                var selectedFile = result[0];
+                var spritePath = selectedFile.Path.LocalPath;
+
+                try
                 {
-                    // Display error message for missing file
-                    var errorWindow = new Window
-                    {
-                        Content = new TextBlock { Text = "Sprite file does not exist." },
-                        Width = 300,
-                        Height = 100
-                    };
-                    errorWindow.ShowDialog(this);
+                    SelectedSprite = new Avalonia.Media.Imaging.Bitmap(spritePath);
+                    if (imgPreview != null)
+                        imgPreview.Source = SelectedSprite;
+                }
+                catch (Exception ex)
+                {
+                    SelectedSprite = null;
+                    if (imgPreview != null)
+                        imgPreview.Source = null;
+
+                    ShowErrorMessage($"Failed to load sprite: {ex.Message}");
                 }
             }
             else
             {
-                // Display error message for empty path
-                var errorWindow = new Window
-                {
-                    Content = new TextBlock { Text = "Please enter a valid sprite path." },
-                    Width = 300,
-                    Height = 100
-                };
-                errorWindow.ShowDialog(this);
+                ShowErrorMessage("No file selected.");
             }
         }
 
@@ -179,40 +174,60 @@ namespace DotGameAvalonia.Views
 
         private void BtnSaveUnit_Click(object? sender, RoutedEventArgs e)
         {
-            if (SelectedName != null && SelectedSprite != null)
+            if (string.IsNullOrWhiteSpace(SelectedName))
             {
-                var unit = new Character(0, 0, SelectedClass, SelectedName)
-                {
-                    Sprite = SelectedSprite
-                };
+                ShowErrorMessage("Please enter a name for the unit.");
+                return;
+            }
 
-                // Save unit to file or database (pseudo-code)
-                UnitRepository.Save(unit);
-                Console.WriteLine("Unit saved successfully.");
-            }
-            else
+            if (SelectedSprite == null)
             {
-                Console.WriteLine("Cannot save unit. Ensure name and sprite are selected.");
+                ShowErrorMessage("Please load a sprite for the unit.");
+                return;
             }
+
+            var unit = new Character(0, 0, SelectedClass, SelectedName)
+            {
+                Sprite = SelectedSprite
+            };
+
+            UnitRepository.Save(unit);
+            Console.WriteLine("Unit saved successfully.");
         }
 
         private void BtnAddToMap_Click(object? sender, RoutedEventArgs e)
         {
-            if (SelectedName != null && SelectedSprite != null)
+            if (string.IsNullOrWhiteSpace(SelectedName))
             {
-                var unit = new Character(0, 0, SelectedClass, SelectedName)
-                {
-                    Sprite = SelectedSprite
-                };
+                ShowErrorMessage("Please enter a name for the unit.");
+                return;
+            }
 
-                // Add unit to map (pseudo-code)
-                MapEditor.AddUnitToMap(unit);
-                Console.WriteLine("Unit added to map successfully.");
-            }
-            else
+            if (SelectedSprite == null)
             {
-                Console.WriteLine("Cannot add unit to map. Ensure name and sprite are selected.");
+                ShowErrorMessage("Please load a sprite for the unit.");
+                return;
             }
+
+            var unit = new Character(0, 0, SelectedClass, SelectedName)
+            {
+                Sprite = SelectedSprite
+            };
+
+            MapEditor.AddUnitToMap(unit);
+            Console.WriteLine("Unit added to map successfully.");
+        }
+
+        private void ShowErrorMessage(string message)
+        {
+            var errorWindow = new Window
+            {
+                Content = new TextBlock { Text = message, Foreground = Brushes.Red, Margin = new Thickness(10) },
+                Width = 300,
+                Height = 100,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            };
+            errorWindow.ShowDialog(this);
         }
     }
 }

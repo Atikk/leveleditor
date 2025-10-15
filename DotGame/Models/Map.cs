@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using Avalonia;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using SkiaSharp;
@@ -19,6 +20,8 @@ namespace DotGameAvalonia.Models
         private string?[,] tiles = default!;
         private readonly Dictionary<string, SKBitmap> imageCache = new(StringComparer.Ordinal);
         public WriteableBitmap? Composite { get; private set; }
+
+        private readonly List<Character> characters = new();
 
         private Map() {}
 
@@ -105,6 +108,51 @@ namespace DotGameAvalonia.Models
             
             imageCache[dataUrl] = bmp;
             return bmp;
+        }
+
+        public void AddCharacter(Character character)
+        {
+            if (character == null)
+                throw new ArgumentNullException(nameof(character));
+
+            if (!InBounds(character.TileX, character.TileY))
+                throw new InvalidOperationException("Character position is out of map bounds.");
+
+            characters.Add(character);
+            Console.WriteLine($"Character '{character.Name}' added to map at position ({character.TileX}, {character.TileY}).");
+        }
+
+        public void RenderCharacters(SKCanvas canvas)
+        {
+            foreach (var character in characters)
+            {
+                var rect = TileRect(character.TileX, character.TileY);
+                var skRect = new SKRect((float)rect.X, (float)rect.Y, (float)(rect.X + rect.Width), (float)(rect.Y + rect.Height));
+
+                if (character.Sprite != null)
+                {
+                    using var skSprite = BitmapToSKBitmap(character.Sprite);
+                    canvas.DrawBitmap(skSprite, skRect);
+                }
+                else
+                {
+                    var paint = new SKPaint { Color = ToSKColor(character.Color), Style = SKPaintStyle.Fill };
+                    canvas.DrawRect(skRect, paint);
+                }
+            }
+        }
+
+        private SKBitmap BitmapToSKBitmap(Bitmap bitmap)
+        {
+            using var stream = new System.IO.MemoryStream();
+            bitmap.Save(stream);
+            stream.Position = 0;
+            return SKBitmap.Decode(stream);
+        }
+
+        private static SKColor ToSKColor(Color color)
+        {
+            return new SKColor(color.R, color.G, color.B, color.A);
         }
 
         private sealed class MapDto

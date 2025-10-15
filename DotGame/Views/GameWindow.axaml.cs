@@ -75,11 +75,19 @@ namespace DotGameAvalonia.Views
             {
                 map = Map.LoadFromJson(mapPath);
                 Console.WriteLine($"Map loaded successfully: {mapPath}");
+
+                // Load saved characters
+                var savedCharacters = UnitRepository.GetAllUnits();
+                foreach (var character in savedCharacters)
+                {
+                    map.AddCharacter(character);
+                }
+
                 InitPlayer(playerSprite, charClass, charName);
                 SpawnMonsters();
                 FitWindowToMap();
                 RenderGame();
-                
+
                 timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000.0 / 30.0) };
                 timer.Tick += GameLoop;
                 timer.Start();

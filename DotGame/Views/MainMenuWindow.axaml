@@ -10,7 +10,7 @@
         <Button Name="BtnEditor" Height="50" Content="Map Editor" FontSize="18" />
         <Button Name="BtnSpriteEditor" Height="50" Content="Sprite Editor" FontSize="18" />
         <Button Name="BtnTestMap" Height="50" Content="Test Map" FontSize="18" />
-        <Button Name="BtnCharCreate" Height="50" Content="Create Character" FontSize="18" />
+        <Button Name="BtnCharCreate" Content="Create Character" Height="50" FontSize="18" />
     </StackPanel>
     
 </Window>

@@ -4,6 +4,7 @@ using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using DotGameAvalonia.Models;
 
 namespace DotGameAvalonia.Views
 {
@@ -75,27 +76,17 @@ namespace DotGameAvalonia.Views
 
                 if (File.Exists(selectedMap))
                 {
-                    var charDialog = new CharacterCreationWindow();
-                    var dialogResult = await charDialog.ShowDialog<bool>(this);
-
-                    if (dialogResult)
+                    try
                     {
-                        var sprite = charDialog.SelectedSprite;
-                        var cls = charDialog.SelectedClass;
-                        var name = string.IsNullOrWhiteSpace(charDialog.SelectedName) ? "Hero" : charDialog.SelectedName;
-
-                        try
+                        var game = new GameWindow(selectedMap, null, CharacterClass.Warrior, "Hero");
+                        await game.ShowDialog(this);
+                    }
+                    catch (Exception ex)
+                    {
+                        await new Window
                         {
-                            var game = new GameWindow(selectedMap, sprite, cls, name);
-                            await game.ShowDialog(this);
-                        }
-                        catch (Exception ex)
-                        {
-                            await new Window
-                            {
-                                Content = new TextBlock { Text = $"Failed to launch game: {ex.Message}" }
-                            }.ShowDialog(this);
-                        }
+                            Content = new TextBlock { Text = $"Failed to launch game: {ex.Message}" }
+                        }.ShowDialog(this);
                     }
                 }
                 else

@@ -118,21 +118,33 @@ namespace DotGameAvalonia.Models
                 var srcRect = currentAnimation.CurrentFrameRect();
                 canvas.DrawBitmap(skSprite, srcRect, skRect);
             }
-            else if (Sprite != null)
-            {
-                using var skSprite = BitmapToSKBitmap(Sprite);
-                var srcRect = new SKRect(FrameIndex * FrameWidth, (int)Direction * FrameHeight, 
-                                         (FrameIndex + 1) * FrameWidth, ((int)Direction + 1) * FrameHeight);
-                canvas.DrawBitmap(skSprite, srcRect, skRect);
-            }
             else
             {
-                var paint = new SKPaint { Color = SKColor.Parse(Color.ToString()), Style = SKPaintStyle.Fill };
+                var fillColor = SafeParseColor(Color.ToString(), SKColors.Red);
+                var paint = new SKPaint { Color = fillColor, Style = SKPaintStyle.Fill };
                 canvas.DrawRect(skRect, paint);
-                
+
                 var borderPaint = new SKPaint { Color = SKColors.Black, Style = SKPaintStyle.Stroke, StrokeWidth = 2 };
                 canvas.DrawRect(skRect, borderPaint);
             }
+        }
+
+        private SKColor SafeParseColor(string? hex, SKColor fallback)
+        {
+            if (string.IsNullOrWhiteSpace(hex))
+                return fallback;
+
+            try
+            {
+                if (!hex.StartsWith("#"))
+                    hex = "#" + hex;
+
+                if (hex.Length == 7 || hex.Length == 9)
+                    return SKColor.Parse(hex);
+            }
+            catch { }
+
+            return fallback;
         }
 
         private SKBitmap BitmapToSKBitmap(Bitmap bitmap)

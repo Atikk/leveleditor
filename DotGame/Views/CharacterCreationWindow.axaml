@@ -9,7 +9,7 @@
     <StackPanel Margin="20" Spacing="10" Background="White">
         <TextBlock Text="Sprite Path (optional):" FontWeight="Bold" Foreground="Black" />
         <TextBox Name="TxtSpritePath" Watermark="Enter path to sprite image (leave blank for default)" Background="White" Foreground="Black" />
-        <Button Name="BtnLoadSprite" Content="Load Sprite from Path" Height="30" Background="#E0E0E0" Foreground="Black" />
+        <Button Name="BtnLoadSprite" Content="Load Sprite from File" Height="30" Click="BtnLoadSprite_Click" />
         
         <Border BorderBrush="Gray" BorderThickness="1" Height="120">
             <Image Name="ImgPreview" Stretch="Uniform" />
