@@ -6,6 +6,8 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,8 +15,13 @@
     <PackageReference Include="Avalonia.Desktop" Version="11.0.10" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.0.10" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.0.10" />
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.4" />
     <PackageReference Include="SkiaSharp" Version="2.88.8" />
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
     <PackageReference Include="Avalonia.ReactiveUI" Version="11.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\src\**\*.cs" />
   </ItemGroup>
 </Project>

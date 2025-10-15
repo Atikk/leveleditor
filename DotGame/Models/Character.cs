@@ -50,6 +50,9 @@ namespace DotGameAvalonia.Models
 
         private int animationCounter = 0;
 
+        public string? BehaviorScript { get; set; }
+        public string? TriggerEvent { get; set; }
+
         public Character(int tileX, int tileY)
         {
             TileX = tileX;

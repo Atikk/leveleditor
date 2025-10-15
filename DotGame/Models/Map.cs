@@ -7,6 +7,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using SkiaSharp;
+using DotGameAvalonia.Models;
 
 namespace DotGameAvalonia.Models
 {
@@ -22,8 +23,10 @@ namespace DotGameAvalonia.Models
         public WriteableBitmap? Composite { get; private set; }
 
         private readonly List<Character> characters = new();
+        private readonly List<Doodad> doodads = new();
+        private readonly List<BehaviorTrigger> triggers = new();
 
-        private Map() {}
+        public Map() {}
 
         public static Map LoadFromJson(string path)
         {
@@ -51,6 +54,34 @@ namespace DotGameAvalonia.Models
                     map.tiles[y, x] = row?[x];
             }
 
+            if (obj.characters != null)
+            {
+                foreach (var charDto in obj.characters)
+                {
+                    var character = new Character(charDto.TileX, charDto.TileY, charDto.Class, charDto.Name)
+                    {
+                        BehaviorScript = charDto.BehaviorScript,
+                        TriggerEvent = charDto.TriggerEvent
+                    };
+                    map.characters.Add(character);
+                }
+            }
+
+            if (obj.doodads != null)
+            {
+                foreach (var doodadDto in obj.doodads)
+                {
+                    var doodad = new Doodad(doodadDto.TileX, doodadDto.TileY, doodadDto.Type)
+                    {
+                        Collidable = doodadDto.Collidable,
+                        Interactable = doodadDto.Interactable,
+                        Animated = doodadDto.Animated,
+                        Trigger = doodadDto.Trigger
+                    };
+                    map.doodads.Add(doodad);
+                }
+            }
+
             map.BuildComposite();
             return map;
         }
@@ -58,6 +89,72 @@ namespace DotGameAvalonia.Models
         public bool InBounds(int tx, int ty) => tx >= 0 && ty >= 0 && tx < Cols && ty < Rows;
 
         public Rect TileRect(int tx, int ty) => new(tx * TileW, ty * TileH, TileW, TileH);
+
+        // Expose tile data (data URL or asset key) for external renderers (e.g., MonoGame)
+        public string? GetTileDataUrl(int tx, int ty)
+        {
+            if (!InBounds(tx, ty)) return null;
+            return tiles[ty, tx];
+        }
+
+        public void InitializeFromArray(int cols, int rows, int tileW, int tileH, string?[,] tileData,
+            IEnumerable<Character>? characterData = null,
+            IEnumerable<Doodad>? doodadData = null,
+            IEnumerable<BehaviorTrigger>? triggerData = null)
+        {
+            if (tileData.GetLength(0) != rows || tileData.GetLength(1) != cols)
+                throw new ArgumentException("Tile data dimensions do not match provided rows/cols.", nameof(tileData));
+
+            Cols = cols;
+            Rows = rows;
+            TileW = tileW;
+            TileH = tileH;
+            tiles = new string?[rows, cols];
+
+            for (int y = 0; y < rows; y++)
+            {
+                for (int x = 0; x < cols; x++)
+                    tiles[y, x] = tileData[y, x];
+            }
+
+            characters.Clear();
+            if (characterData != null)
+            {
+                foreach (var c in characterData)
+                    characters.Add(c);
+            }
+
+            doodads.Clear();
+            if (doodadData != null)
+            {
+                foreach (var d in doodadData)
+                    doodads.Add(d);
+            }
+
+            triggers.Clear();
+            if (triggerData != null)
+            {
+                foreach (var t in triggerData)
+                    triggers.Add(t);
+            }
+        }
+
+        public Map Clone()
+        {
+            var clone = new Map();
+            if (Rows == 0 || Cols == 0)
+                return clone;
+
+            var copy = new string?[Rows, Cols];
+            for (int y = 0; y < Rows; y++)
+            {
+                for (int x = 0; x < Cols; x++)
+                    copy[y, x] = tiles?[y, x];
+            }
+
+            clone.InitializeFromArray(Cols, Rows, TileW, TileH, copy, characters, doodads, triggers);
+            return clone;
+        }
 
         public void BuildComposite()
         {
@@ -110,16 +207,53 @@ namespace DotGameAvalonia.Models
             return bmp;
         }
 
+        public IReadOnlyList<Character> Characters => characters;
+        public IReadOnlyList<Doodad> Doodads => doodads;
+        public IReadOnlyList<BehaviorTrigger> Triggers => triggers;
+
         public void AddCharacter(Character character)
         {
-            if (character == null)
-                throw new ArgumentNullException(nameof(character));
-
+            if (character == null) throw new ArgumentNullException(nameof(character));
             if (!InBounds(character.TileX, character.TileY))
-                throw new InvalidOperationException("Character position is out of map bounds.");
+                throw new ArgumentException("Character position is out of bounds.", nameof(character));
 
             characters.Add(character);
-            Console.WriteLine($"Character '{character.Name}' added to map at position ({character.TileX}, {character.TileY}).");
+        }
+
+        public void RemoveCharacter(Character character)
+        {
+            if (character == null) throw new ArgumentNullException(nameof(character));
+            characters.Remove(character);
+        }
+
+        public void AddDoodad(Doodad doodad)
+        {
+            if (doodad == null) throw new ArgumentNullException(nameof(doodad));
+            if (!InBounds(doodad.TileX, doodad.TileY))
+                throw new ArgumentException("Doodad position is out of bounds.", nameof(doodad));
+
+            doodads.Add(doodad);
+        }
+
+        public void RemoveDoodad(Doodad doodad)
+        {
+            if (doodad == null) throw new ArgumentNullException(nameof(doodad));
+            doodads.Remove(doodad);
+        }
+
+        public void AddTrigger(BehaviorTrigger trigger)
+        {
+            if (trigger == null) throw new ArgumentNullException(nameof(trigger));
+            if (!InBounds(trigger.TileX, trigger.TileY))
+                throw new ArgumentException("Trigger position is out of bounds.", nameof(trigger));
+
+            triggers.Add(trigger);
+        }
+
+        public void RemoveTrigger(BehaviorTrigger trigger)
+        {
+            if (trigger == null) throw new ArgumentNullException(nameof(trigger));
+            triggers.Remove(trigger);
         }
 
         public void RenderCharacters(SKCanvas canvas)
@@ -137,6 +271,26 @@ namespace DotGameAvalonia.Models
                 else
                 {
                     var paint = new SKPaint { Color = ToSKColor(character.Color), Style = SKPaintStyle.Fill };
+                    canvas.DrawRect(skRect, paint);
+                }
+            }
+        }
+
+        public void RenderDoodads(SKCanvas canvas)
+        {
+            foreach (var doodad in doodads)
+            {
+                var rect = TileRect(doodad.TileX, doodad.TileY);
+                var skRect = new SKRect((float)rect.X, (float)rect.Y, (float)(rect.X + rect.Width), (float)(rect.Y + rect.Height));
+
+                if (doodad.Sprite != null)
+                {
+                    using var skSprite = BitmapToSKBitmap(doodad.Sprite);
+                    canvas.DrawBitmap(skSprite, skRect);
+                }
+                else
+                {
+                    var paint = new SKPaint { Color = ToSKColor(doodad.Color), Style = SKPaintStyle.Fill };
                     canvas.DrawRect(skRect, paint);
                 }
             }
@@ -162,6 +316,36 @@ namespace DotGameAvalonia.Models
             public int tileW { get; set; }
             public int tileH { get; set; }
             public string?[][]? map { get; set; }
+            public List<CharacterDto>? characters { get; set; }
+            public List<DoodadDto>? doodads { get; set; }
         }
+
+        private sealed class CharacterDto
+        {
+            public int TileX { get; set; }
+            public int TileY { get; set; }
+            public string Name { get; set; } = "Hero";
+            public CharacterClass Class { get; set; } = CharacterClass.Warrior;
+            public string? BehaviorScript { get; set; }
+            public string? TriggerEvent { get; set; }
+        }
+
+        private sealed class DoodadDto
+        {
+            public int TileX { get; set; }
+            public int TileY { get; set; }
+            public string Type { get; set; } = "";
+            public bool Collidable { get; set; } = false;
+            public bool Interactable { get; set; } = false;
+            public bool Animated { get; set; } = false;
+            public string? Trigger { get; set; }
+        }
+    }
+
+    public class BehaviorTrigger
+    {
+        public int TileX { get; set; }
+        public int TileY { get; set; }
+        public string Name { get; set; } = string.Empty;
     }
 }

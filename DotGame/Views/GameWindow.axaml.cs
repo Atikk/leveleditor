@@ -15,11 +15,11 @@ namespace DotGameAvalonia.Views
 {
     public partial class GameWindow : Window
     {
-        private Map? map;
+        private Map map;
         private Character? player;
         private List<Monster> monsters = new();
         private Canvas? gameCanvas;
-        private DispatcherTimer? timer;
+        private DispatcherTimer timer = new DispatcherTimer();
         private CombatManager? combatManager;
         private bool playerMovedThisFrame = false;
 
@@ -41,10 +41,17 @@ namespace DotGameAvalonia.Views
         {
             InitializeComponent();
             AttachEvents();
-            if (!string.IsNullOrEmpty(mapPath))
+
+            if (string.IsNullOrEmpty(mapPath))
             {
-                LoadGame(mapPath, playerSprite, charClass, charName);
+                throw new ArgumentException("Map path cannot be null or empty.", nameof(mapPath));
             }
+
+            map = Map.LoadFromJson(mapPath) ?? throw new InvalidOperationException("Failed to load map. The map data is null.");
+
+            InitPlayer(playerSprite, charClass, charName);
+            FitWindowToMap();
+            RenderGame();
         }
 
         private void AttachEvents()
@@ -67,42 +74,6 @@ namespace DotGameAvalonia.Views
             
             if (btnDefend != null)
                 btnDefend.Click += (s, e) => HandlePlayerDefend();
-        }
-
-        private void LoadGame(string mapPath, Bitmap? playerSprite, CharacterClass charClass, string charName)
-        {
-            try
-            {
-                map = Map.LoadFromJson(mapPath);
-                Console.WriteLine($"Map loaded successfully: {mapPath}");
-
-                // Load saved characters
-                var savedCharacters = UnitRepository.GetAllUnits();
-                foreach (var character in savedCharacters)
-                {
-                    map.AddCharacter(character);
-                }
-
-                InitPlayer(playerSprite, charClass, charName);
-                SpawnMonsters();
-                FitWindowToMap();
-                RenderGame();
-
-                timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000.0 / 30.0) };
-                timer.Tick += GameLoop;
-                timer.Start();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error loading map: {ex.Message}");
-                var errorText = new TextBlock
-                {
-                    Text = $"Error loading map: {ex.Message}",
-                    Foreground = Brushes.White,
-                    Margin = new Thickness(10)
-                };
-                gameCanvas?.Children.Add(errorText);
-            }
         }
 
         private void InitPlayer(Bitmap? sprite, CharacterClass cls, string name)
@@ -152,13 +123,13 @@ namespace DotGameAvalonia.Views
 
         private void FitWindowToMap()
         {
-            if (map is null) return;
+            if (map == null)
+            {
+                throw new InvalidOperationException("Map is not initialized.");
+            }
 
-            var w = map.Cols * map.TileW;
-            var h = map.Rows * map.TileH;
-
-            Width = Math.Min(1200, w + 16);
-            Height = Math.Min(900, h + 39);
+            Width = map!.Cols * map!.TileW;
+            Height = map!.Rows * map!.TileH;
         }
 
         private void GameLoop(object? sender, EventArgs e)
@@ -173,15 +144,15 @@ namespace DotGameAvalonia.Views
             playerMovedThisFrame = false;
 
             player?.UpdateAnimation();
-            
+
             foreach (var monster in monsters)
             {
                 monster.UpdateAnimation();
-                
+
                 if (combatManager == null || !combatManager.CombatActive)
                 {
                     monster.UpdateAI(map!, player!);
-                    
+
                     if (!monster.DidMoveThisUpdate && monster.CurrentState == AnimationState.Walk)
                     {
                         monster.SetAnimation(AnimationState.Idle);
@@ -264,7 +235,15 @@ namespace DotGameAvalonia.Views
 
         private void RenderGame()
         {
-            if (map?.Composite == null || player == null || gameCanvas == null)
+            if (map == null || map.Composite == null || map.Cols <= 0 || map.TileW <= 0)
+                return;
+
+            var mapWidth = map.Cols * map.TileW;
+            var mapHeight = map.Rows * map.TileH;
+            Width = map!.Cols * map!.TileW;
+            Height = mapHeight;
+
+            if (gameCanvas == null)
                 return;
 
             gameCanvas.Children.Clear();
@@ -293,11 +272,21 @@ namespace DotGameAvalonia.Views
                 player.Draw(canvas, map);
             }
 
+            if (map != null)
+            {
+                map.RenderDoodads(canvas);
+            }
+
             var image = surface.Snapshot();
             var data = image.Encode(SKEncodedImageFormat.Png, 100);
             using var stream = new MemoryStream(data.ToArray());
             var entityLayer = new Bitmap(stream);
             
+            if (map == null)
+            {
+                throw new InvalidOperationException("Map is not initialized.");
+            }
+
             var entityImg = new Image
             {
                 Source = entityLayer,

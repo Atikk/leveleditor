@@ -1,5 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="DotGameAvalonia.Views.EditorWindow"
         Title="DotGame Map Editor"
         Width="1200" Height="800"
@@ -42,9 +42,17 @@
             <StackPanel Orientation="Horizontal" Margin="0,5">
                 <Button Name="BtnSaveMap" Content="Save Map" Margin="5,0" Width="130" />
                 <Button Name="BtnLoadMap" Content="Load Map" Margin="5,0" Width="130" />
+                <Button Name="BtnMonoGamePreview" Content="MonoGame Preview" Margin="5,0" Width="150" />
                 <Button Name="BtnSpriteEditor" Content="Sprite Editor" Margin="10,0,5,0" Width="130" Background="LightBlue" />
                 <TextBlock Text="Select tiles and paint on the grid. Right-click to erase." 
                           VerticalAlignment="Center" Margin="20,0" Foreground="Gray" />
+            </StackPanel>
+
+            <!-- Row 4: Mode Switching -->
+            <StackPanel Orientation="Horizontal" Margin="0,5">
+                <Button Name="BtnModeTiles" Content="Tiles" Margin="5,0" Width="100" Click="SwitchToTilesMode" />
+                <Button Name="BtnModeCharacters" Content="Characters" Margin="5,0" Width="100" Click="SwitchToCharactersMode" />
+                <Button Name="BtnModeDoodads" Content="Doodads" Margin="5,0" Width="100" Click="SwitchToDoodadsMode" />
             </StackPanel>
         </StackPanel>
         
@@ -61,6 +69,34 @@
                     PointerPressed="MapCanvas_PointerPressed"
                     PointerMoved="MapCanvas_PointerMoved"
                     PointerReleased="MapCanvas_PointerReleased" />
+        </Border>
+
+        <!-- Tool Palette (Left Side) -->
+        <Border DockPanel.Dock="Left" BorderBrush="Gray" BorderThickness="1" Width="220" Background="White">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Name="ToolPalette" Margin="5">
+                    <!-- Tiles Tools -->
+                    <StackPanel x:Name="TilesTools" IsVisible="True">
+                        <TextBlock Text="Tile Tools" FontWeight="Bold" Margin="0,0,0,5" />
+                        <Button Content="Select Tile" Margin="0,5" Width="200" />
+                        <Button Content="Fill Area" Margin="0,5" Width="200" />
+                    </StackPanel>
+
+                    <!-- Characters Tools -->
+                    <StackPanel x:Name="CharactersTools" IsVisible="False">
+                        <TextBlock Text="Character Tools" FontWeight="Bold" Margin="0,0,0,5" />
+                        <Button Content="Add Character" Margin="0,5" Width="200" />
+                        <Button Content="Edit Character" Margin="0,5" Width="200" />
+                    </StackPanel>
+
+                    <!-- Doodads Tools -->
+                    <StackPanel x:Name="DoodadsTools" IsVisible="False">
+                        <TextBlock Text="Doodad Tools" FontWeight="Bold" Margin="0,0,0,5" />
+                        <Button Content="Add Doodad" Margin="0,5" Width="200" />
+                        <Button Content="Edit Doodad" Margin="0,5" Width="200" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
         </Border>
     </DockPanel>
     

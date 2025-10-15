@@ -78,6 +78,17 @@ namespace DotGameAvalonia.Views
                 {
                     try
                     {
+                        // Validate the map file
+                        var map = Map.LoadFromJson(selectedMap);
+                        if (map == null)
+                        {
+                            await new Window
+                            {
+                                Content = new TextBlock { Text = "The selected file does not contain valid map data." }
+                            }.ShowDialog(this);
+                            return;
+                        }
+
                         var game = new GameWindow(selectedMap, null, CharacterClass.Warrior, "Hero");
                         await game.ShowDialog(this);
                     }
