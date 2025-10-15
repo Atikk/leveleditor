@@ -15,5 +15,6 @@
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.0.10" />
     <PackageReference Include="SkiaSharp" Version="2.88.8" />
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="Avalonia.ReactiveUI" Version="11.0.10" />
   </ItemGroup>
 </Project>

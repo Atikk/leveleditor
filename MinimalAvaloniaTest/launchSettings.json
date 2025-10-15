@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "MinimalAvaloniaTest": {
+      "commandName": "Project",
+      "workingDirectory": "c:\\Users\\ninot\\Downloads\\leveleditor (2)\\leveleditor\\MinimalAvaloniaTest\\bin\\Debug\\net8.0",
+      "launchBrowser": false
+    }
+  }
+}

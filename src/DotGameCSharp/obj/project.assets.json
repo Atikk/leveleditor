@@ -8,19 +8,19 @@
     "net7.0-windows7.0": []
   },
   "packageFolders": {
-    "/home/runner/.nuget/packages/": {}
+    "C:\\Users\\ninot\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/home/runner/workspace/src/DotGameCSharp/DotGameCSharp.csproj",
+      "projectUniqueName": "C:\\Users\\ninot\\Downloads\\leveleditor (2)\\leveleditor\\src\\DotGameCSharp\\DotGameCSharp.csproj",
       "projectName": "DotGameCSharp",
-      "projectPath": "/home/runner/workspace/src/DotGameCSharp/DotGameCSharp.csproj",
-      "packagesPath": "/home/runner/.nuget/packages/",
-      "outputPath": "/home/runner/workspace/src/DotGameCSharp/obj/",
+      "projectPath": "C:\\Users\\ninot\\Downloads\\leveleditor (2)\\leveleditor\\src\\DotGameCSharp\\DotGameCSharp.csproj",
+      "packagesPath": "C:\\Users\\ninot\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\ninot\\Downloads\\leveleditor (2)\\leveleditor\\src\\DotGameCSharp\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "/home/runner/.nuget/NuGet/NuGet.Config"
+        "C:\\Users\\ninot\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net7.0-windows"
@@ -38,6 +38,11 @@
         "warnAsError": [
           "NU1605"
         ]
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "direct"
       }
     },
     "frameworks": {
@@ -56,6 +61,18 @@
         "warn": true,
         "downloadDependencies": [
           {
+            "name": "Microsoft.AspNetCore.App.Ref",
+            "version": "[7.0.20, 7.0.20]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Host.win-x64",
+            "version": "[7.0.20, 7.0.20]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Ref",
+            "version": "[7.0.20, 7.0.20]"
+          },
+          {
             "name": "Microsoft.WindowsDesktop.App.Ref",
             "version": "[7.0.20, 7.0.20]"
           }
@@ -68,7 +85,7 @@
             "privateAssets": "none"
           }
         },
-        "runtimeIdentifierGraphPath": "/nix/store/4k08ckhym1bcwnsk52j201a80l2xrkhp-dotnet-sdk-7.0.410/sdk/7.0.410/RuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.406\\RuntimeIdentifierGraph.json"
       }
     }
   }

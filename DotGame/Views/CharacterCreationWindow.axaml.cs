@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
 using DotGameAvalonia.Models;
+using DotGameAvalonia.Assets;
 
 namespace DotGameAvalonia.Views
 {
@@ -24,6 +25,18 @@ namespace DotGameAvalonia.Views
         {
             InitializeComponent();
             AttachEvents();
+            // provide a default sprite for easier testing
+            try
+            {
+                SelectedSprite = DefaultSprite.GetDefaultSprite();
+                imgPreview = this.FindControl<Image>("ImgPreview");
+                if (imgPreview != null)
+                    imgPreview.Source = SelectedSprite;
+            }
+            catch
+            {
+                // ignore failures generating default sprite
+            }
             UpdateStats();
         }
 

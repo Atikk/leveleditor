@@ -34,6 +34,20 @@ cd src/DotGameCSharp
 dotnet run
 ```
 
+#### Running on Windows (helper script)
+
+If you prefer a small helper script to build and run the Avalonia demo on Windows, there's a PowerShell script at the repo root:
+
+```powershell
+.\run-windows.ps1
+```
+
+Usage notes:
+- Requires the .NET 8 SDK (dotnet) on PATH.
+- By default the script builds and runs `DotGame\DotGameAvalonia.csproj` in `Debug` configuration.
+- Run `Get-Help .\run-windows.ps1 -Full` for available parameters (configuration, skip build, run detached, etc.).
+
+
 #### Option 3: Port Game Logic to Avalonia
 The original game logic (`Map.cs`, `Character.cs`, `GameForm.cs`) can be ported to the working Avalonia framework. The Avalonia demo proves the environment is ready!
 

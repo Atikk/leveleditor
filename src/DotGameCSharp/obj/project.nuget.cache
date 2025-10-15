@@ -1,10 +1,13 @@
 {
   "version": 2,
-  "dgSpecHash": "w1CUTEbArVbgkoHW4xCzRm9fmqroKnumGuP1NeUGzEwW3CerBwCMMfZM21puYpV2zzTJKyNf9U8+Nn/KwLNr0Q==",
+  "dgSpecHash": "OPX9XHRXWoA=",
   "success": true,
-  "projectFilePath": "/home/runner/workspace/src/DotGameCSharp/DotGameCSharp.csproj",
+  "projectFilePath": "C:\\Users\\ninot\\Downloads\\leveleditor (2)\\leveleditor\\src\\DotGameCSharp\\DotGameCSharp.csproj",
   "expectedPackageFiles": [
-    "/home/runner/.nuget/packages/microsoft.windowsdesktop.app.ref/7.0.20/microsoft.windowsdesktop.app.ref.7.0.20.nupkg.sha512"
+    "C:\\Users\\ninot\\.nuget\\packages\\microsoft.netcore.app.ref\\7.0.20\\microsoft.netcore.app.ref.7.0.20.nupkg.sha512",
+    "C:\\Users\\ninot\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\7.0.20\\microsoft.windowsdesktop.app.ref.7.0.20.nupkg.sha512",
+    "C:\\Users\\ninot\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\7.0.20\\microsoft.aspnetcore.app.ref.7.0.20.nupkg.sha512",
+    "C:\\Users\\ninot\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\7.0.20\\microsoft.netcore.app.host.win-x64.7.0.20.nupkg.sha512"
   ],
   "logs": []
 }

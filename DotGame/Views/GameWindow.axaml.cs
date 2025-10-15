@@ -110,6 +110,9 @@ namespace DotGameAvalonia.Views
             {
                 player.InitializeAnimations(32, 32, 3);
             }
+            
+            // Update window title to show player info for easier testing/debugging
+            this.Title = $"DotGame - {player.Name} ({player.Class}) HP {player.CurrentHP}/{player.Attributes.MaxHP}";
         }
 
         private void SpawnMonsters()
