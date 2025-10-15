@@ -164,26 +164,38 @@ namespace DotGameAvalonia.Models
             }
         }
 
+        private SKColor SafeParseColor(string? hex, SKColor fallback)
+        {
+            if (string.IsNullOrWhiteSpace(hex))
+                return fallback;
+
+            try
+            {
+                // Ensure hex starts with '#' and has valid length
+                if (!hex.StartsWith("#"))
+                    hex = "#" + hex;
+
+                // SKColor.Parse only accepts #RRGGBB or #AARRGGBB
+                if (hex.Length == 7 || hex.Length == 9)
+                    return SKColor.Parse(hex);
+            }
+            catch { }
+
+            return fallback;
+        }
+
         public void Draw(SKCanvas canvas, Map map)
         {
             var rect = map.TileRect(TileX, TileY);
             var skRect = new SKRect((float)rect.X, (float)rect.Y, 
                                     (float)(rect.X + rect.Width), (float)(rect.Y + rect.Height));
 
-            if (Sprite != null && currentAnimation != null)
-            {
-                using var skSprite = BitmapToSKBitmap(Sprite);
-                var srcRect = currentAnimation.CurrentFrameRect();
-                canvas.DrawBitmap(skSprite, srcRect, skRect);
-            }
-            else
-            {
-                var paint = new SKPaint { Color = SKColor.Parse(Color.ToString()), Style = SKPaintStyle.Fill };
-                canvas.DrawRect(skRect, paint);
-                
-                var borderPaint = new SKPaint { Color = SKColors.Black, Style = SKPaintStyle.Stroke, StrokeWidth = 2 };
-                canvas.DrawRect(skRect, borderPaint);
-            }
+            var fillColor = SafeParseColor(Color.ToString(), SKColors.Red);
+            var paint = new SKPaint { Color = fillColor, Style = SKPaintStyle.Fill };
+            canvas.DrawRect(skRect, paint);
+
+            var borderPaint = new SKPaint { Color = SKColors.Black, Style = SKPaintStyle.Stroke, StrokeWidth = 2 };
+            canvas.DrawRect(skRect, borderPaint);
 
             if (!IsAlive)
             {

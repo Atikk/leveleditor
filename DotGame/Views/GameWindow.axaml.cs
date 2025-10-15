@@ -74,6 +74,7 @@ namespace DotGameAvalonia.Views
             try
             {
                 map = Map.LoadFromJson(mapPath);
+                Console.WriteLine($"Map loaded successfully: {mapPath}");
                 InitPlayer(playerSprite, charClass, charName);
                 SpawnMonsters();
                 FitWindowToMap();
@@ -85,6 +86,7 @@ namespace DotGameAvalonia.Views
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"Error loading map: {ex.Message}");
                 var errorText = new TextBlock
                 {
                     Text = $"Error loading map: {ex.Message}",
@@ -105,10 +107,15 @@ namespace DotGameAvalonia.Views
                 Sprite = sprite,
                 Color = sprite != null ? Colors.Transparent : Colors.DeepSkyBlue
             };
-            
+
             if (sprite != null)
             {
                 player.InitializeAnimations(32, 32, 3);
+                Console.WriteLine($"Player sprite loaded successfully: {sprite.PixelSize.Width}x{sprite.PixelSize.Height}");
+            }
+            else
+            {
+                Console.WriteLine("Player sprite is null. Default color applied.");
             }
             
             // Update window title to show player info for easier testing/debugging
