@@ -13,3 +13,23 @@
 
 #---------------------------------- Content ---------------------------------#
 
+
+#begin Textures/grass.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Textures/grass.png
+#end
+
+#begin Maps/sample.tmx
+/importer:MonoGame.Extended.Content.Pipeline.Tiled.TiledMapImporter
+/processor:MonoGame.Extended.Content.Pipeline.Tiled.TiledMapProcessor
+/build:Maps/sample.tmx
+#end
+

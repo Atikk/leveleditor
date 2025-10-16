@@ -1,5 +1,7 @@
 using System;
 using Avalonia.Media;
+using DotGame.Runtime.Content;
+using DotGame.Runtime.Rendering;
 using DotGameAvalonia.Engine;
 using DotGameAvalonia.Engine.Components;
 using DotGameAvalonia.Models;
@@ -8,8 +10,6 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using MonoGame.Extended.ViewportAdapters;
 using MonoGame.Extended;
-using MonoGame.Extended.Tiled;
-using MonoGame.Extended.Tiled.Renderers;
 using AvaloniaColor = Avalonia.Media.Color;
 using XnaColor = Microsoft.Xna.Framework.Color;
 
@@ -30,8 +30,7 @@ namespace DotGameAvalonia.MonoGameLayer
         private BoxingViewportAdapter? _viewportAdapter;
         private Texture2D? _whitePixel;
         private OrthographicCamera? _camera;
-        private TiledMap? _tiledMap;
-        private TiledMapRenderer? _tiledRenderer;
+    private RuntimeTiledMap? _runtimeTiledMap;
         private Map? _pendingMap;
         private bool _mapDirty;
         private Entity? _playerEntity;
@@ -80,7 +79,6 @@ namespace DotGameAvalonia.MonoGameLayer
         protected override void Update(GameTime gameTime)
         {
             ApplyPendingMapSwap();
-            _tiledRenderer?.Update(gameTime);
             HandleCameraInput(gameTime);
             _world?.Update(gameTime);
             base.Update(gameTime);
@@ -91,9 +89,11 @@ namespace DotGameAvalonia.MonoGameLayer
             GraphicsDevice.Clear(new XnaColor(30, 30, 35));
             var viewMatrix = ComposeViewMatrix();
 
-            if (_tiledRenderer != null)
+            if (_runtimeTiledMap != null && _spriteBatch != null)
             {
-                _tiledRenderer.Draw(viewMatrix);
+                _spriteBatch.Begin(transformMatrix: viewMatrix, samplerState: SamplerState.PointClamp);
+                RuntimeTiledMapRenderer.DrawTileLayers(_spriteBatch, _runtimeTiledMap);
+                _spriteBatch.End();
             }
             else
             {
@@ -114,7 +114,7 @@ namespace DotGameAvalonia.MonoGameLayer
             {
                 _assets?.Clear();
                 _whitePixel?.Dispose();
-                _tiledRenderer?.Dispose();
+                _runtimeTiledMap = null;
             }
 
             base.Dispose(disposing);
@@ -157,9 +157,7 @@ namespace DotGameAvalonia.MonoGameLayer
 
         private void LoadExternalTileMap()
         {
-            _tiledRenderer?.Dispose();
-            _tiledRenderer = null;
-            _tiledMap = null;
+            _runtimeTiledMap = null;
 
             if (_assets == null)
                 return;
@@ -169,14 +167,12 @@ namespace DotGameAvalonia.MonoGameLayer
 
             try
             {
-                _tiledMap = _assets.GetTiledMap(_map.ExternalTileMapAsset);
-                _tiledRenderer = new TiledMapRenderer(GraphicsDevice, _tiledMap);
+                _runtimeTiledMap = _assets.GetRuntimeTiledMap(_map.ExternalTileMapAsset);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Failed to load tiled map '{_map.ExternalTileMapAsset}': {ex.Message}");
-                _tiledMap = null;
-                _tiledRenderer = null;
+                _runtimeTiledMap = null;
             }
         }
 

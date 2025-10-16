@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.IO;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
-using MonoGame.Extended.Tiled;
+using DotGame.Runtime.Content;
 
 namespace DotGameAvalonia.MonoGameLayer
 {
@@ -11,9 +11,9 @@ namespace DotGameAvalonia.MonoGameLayer
     {
         private readonly GraphicsDevice _gfx;
         private readonly ContentManager _content;
-    private readonly ConcurrentDictionary<string, Texture2D> _runtimeTextures = new();
+        private readonly ConcurrentDictionary<string, Texture2D> _runtimeTextures = new();
         private readonly ConcurrentDictionary<string, Texture2D> _contentTextures = new(StringComparer.OrdinalIgnoreCase);
-        private readonly ConcurrentDictionary<string, TiledMap> _tiledMaps = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, RuntimeTiledMap> _runtimeTiledMaps = new(StringComparer.OrdinalIgnoreCase);
 
         public AssetManager(ContentManager content, GraphicsDevice gfx)
         {
@@ -49,18 +49,20 @@ namespace DotGameAvalonia.MonoGameLayer
             return contentTexture;
         }
 
-        public TiledMap GetTiledMap(string assetName)
+        public RuntimeTiledMap GetRuntimeTiledMap(string assetName)
         {
             if (string.IsNullOrWhiteSpace(assetName))
                 throw new ArgumentException("Asset name must be provided.", nameof(assetName));
 
             var normalized = NormalizeAssetKey(assetName);
-
-            if (_tiledMaps.TryGetValue(normalized, out var cached))
+            if (_runtimeTiledMaps.TryGetValue(normalized, out var cached))
+            {
                 return cached;
+            }
 
-            var map = _content.Load<TiledMap>(normalized);
-            _tiledMaps[normalized] = map;
+            var path = ResolveMapPath(normalized);
+            var map = new RuntimeTiledMap(_gfx, path);
+            _runtimeTiledMaps[normalized] = map;
             return map;
         }
 
@@ -70,10 +72,14 @@ namespace DotGameAvalonia.MonoGameLayer
                 kv.Value.Dispose();
 
             _runtimeTextures.Clear();
+            foreach (var kvp in _runtimeTiledMaps)
+            {
+                kvp.Value.Dispose();
+            }
+
+            _runtimeTiledMaps.Clear();
             _content.Unload();
             _contentTextures.Clear();
-
-            _tiledMaps.Clear();
         }
 
         private static bool IsDataUrl(string key) => key.StartsWith("data:", StringComparison.OrdinalIgnoreCase);
@@ -100,6 +106,42 @@ namespace DotGameAvalonia.MonoGameLayer
         private static string NormalizeAssetKey(string key)
         {
             return key.Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
+        }
+
+        private string ResolveMapPath(string normalizedAsset)
+        {
+            var candidate = normalizedAsset;
+            if (!Path.HasExtension(candidate))
+            {
+                candidate += ".tmx";
+            }
+
+            if (Path.IsPathRooted(candidate) && File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            var baseDirectory = AppContext.BaseDirectory ?? Environment.CurrentDirectory;
+
+            var resolved = Path.Combine(baseDirectory, candidate.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(resolved))
+            {
+                return resolved;
+            }
+
+            resolved = Path.Combine(baseDirectory, "Content", candidate.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(resolved))
+            {
+                return resolved;
+            }
+
+            resolved = Path.Combine(baseDirectory, "Content", normalizedAsset.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(resolved))
+            {
+                return resolved;
+            }
+
+            throw new FileNotFoundException($"Unable to locate tiled map asset '{normalizedAsset}'.", normalizedAsset);
         }
 
         private Texture2D CreateTextureFromFile(string path)

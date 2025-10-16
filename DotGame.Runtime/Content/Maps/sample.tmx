@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="10" height="10" tilewidth="32" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="4">
+ <tileset firstgid="1" source="../Tilesets/Grass.tsx"/>
+ <layer id="1" name="Ground" width="10" height="10">
+  <data encoding="csv">
+1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1
+  </data>
+ </layer>
+ <objectgroup id="2" name="Collisions">
+  <object id="1" x="160" y="160" width="128" height="32"/>
+  <object id="2" x="224" y="320" width="160" height="32"/>
+ </objectgroup>
+ <objectgroup id="3" name="Spawns">
+  <object id="3" name="Player" x="96" y="96"/>
+ </objectgroup>
+</map>
