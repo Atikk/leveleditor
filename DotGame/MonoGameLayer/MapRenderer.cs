@@ -27,9 +27,10 @@ namespace DotGameAvalonia.MonoGameLayer
             _resolver = resolver;
         }
 
-        public void Draw(Map map, Vector2 origin)
+        public void Draw(Map map, Vector2 origin, Matrix? viewMatrix = null, bool includeActors = true)
         {
-            _sb.Begin(samplerState: SamplerState.PointClamp);
+            var transform = viewMatrix ?? Matrix.Identity;
+            _sb.Begin(samplerState: SamplerState.PointClamp, transformMatrix: transform);
 
             // Tiles (supports file paths and base64 data URLs)
             for (int y = 0; y < map.Rows; y++)
@@ -45,19 +46,22 @@ namespace DotGameAvalonia.MonoGameLayer
                 }
             }
 
-            // Doodads and Characters: render as colored rectangles for now (no texture path on models)
-            foreach (var d in map.Doodads)
+            if (includeActors)
             {
-                var rect = map.TileRect(d.TileX, d.TileY);
-                var dst = new Rectangle((int)(origin.X + rect.X), (int)(origin.Y + rect.Y), (int)rect.Width, (int)rect.Height);
-                DrawFilledRect(dst, new Color(d.Color.R, d.Color.G, d.Color.B, d.Color.A));
-            }
+                // Doodads and Characters: render as colored rectangles for now (no texture path on models)
+                foreach (var d in map.Doodads)
+                {
+                    var rect = map.TileRect(d.TileX, d.TileY);
+                    var dst = new Rectangle((int)(origin.X + rect.X), (int)(origin.Y + rect.Y), (int)rect.Width, (int)rect.Height);
+                    DrawFilledRect(dst, new Color(d.Color.R, d.Color.G, d.Color.B, d.Color.A));
+                }
 
-            foreach (var c in map.Characters)
-            {
-                var rect = map.TileRect(c.TileX, c.TileY);
-                var dst = new Rectangle((int)(origin.X + rect.X), (int)(origin.Y + rect.Y), (int)rect.Width, (int)rect.Height);
-                DrawFilledRect(dst, new Color(c.Color.R, c.Color.G, c.Color.B, c.Color.A));
+                foreach (var c in map.Characters)
+                {
+                    var rect = map.TileRect(c.TileX, c.TileY);
+                    var dst = new Rectangle((int)(origin.X + rect.X), (int)(origin.Y + rect.Y), (int)rect.Width, (int)rect.Height);
+                    DrawFilledRect(dst, new Color(c.Color.R, c.Color.G, c.Color.B, c.Color.A));
+                }
             }
 
             _sb.End();

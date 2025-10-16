@@ -26,6 +26,8 @@ namespace DotGameAvalonia.Models
         private readonly List<Doodad> doodads = new();
         private readonly List<BehaviorTrigger> triggers = new();
 
+    public string? ExternalTileMapAsset { get; private set; }
+
         public Map() {}
 
         public static Map LoadFromJson(string path)
@@ -63,6 +65,17 @@ namespace DotGameAvalonia.Models
                         BehaviorScript = charDto.BehaviorScript,
                         TriggerEvent = charDto.TriggerEvent
                     };
+                    if (!string.IsNullOrWhiteSpace(charDto.Color))
+                    {
+                        try
+                        {
+                            character.Color = Color.Parse(charDto.Color);
+                        }
+                        catch
+                        {
+                            // ignore malformed color values
+                        }
+                    }
                     map.characters.Add(character);
                 }
             }
@@ -76,12 +89,38 @@ namespace DotGameAvalonia.Models
                         Collidable = doodadDto.Collidable,
                         Interactable = doodadDto.Interactable,
                         Animated = doodadDto.Animated,
-                        Trigger = doodadDto.Trigger
+                        Trigger = doodadDto.Trigger,
+                        OnInteract = doodadDto.OnInteract
                     };
+                    if (!string.IsNullOrWhiteSpace(doodadDto.Color))
+                    {
+                        try
+                        {
+                            doodad.Color = Color.Parse(doodadDto.Color);
+                        }
+                        catch
+                        {
+                            // ignore malformed color values
+                        }
+                    }
                     map.doodads.Add(doodad);
                 }
             }
 
+            map.ExternalTileMapAsset = obj.externalTileMapAsset;
+            if (obj.triggers != null)
+            {
+                foreach (var triggerDto in obj.triggers)
+                {
+                    var trigger = new BehaviorTrigger
+                    {
+                        TileX = triggerDto.TileX,
+                        TileY = triggerDto.TileY,
+                        Name = triggerDto.Name ?? string.Empty
+                    };
+                    map.AddTrigger(trigger);
+                }
+            }
             map.BuildComposite();
             return map;
         }
@@ -100,7 +139,8 @@ namespace DotGameAvalonia.Models
         public void InitializeFromArray(int cols, int rows, int tileW, int tileH, string?[,] tileData,
             IEnumerable<Character>? characterData = null,
             IEnumerable<Doodad>? doodadData = null,
-            IEnumerable<BehaviorTrigger>? triggerData = null)
+            IEnumerable<BehaviorTrigger>? triggerData = null,
+            string? externalTileMapAsset = null)
         {
             if (tileData.GetLength(0) != rows || tileData.GetLength(1) != cols)
                 throw new ArgumentException("Tile data dimensions do not match provided rows/cols.", nameof(tileData));
@@ -137,6 +177,8 @@ namespace DotGameAvalonia.Models
                 foreach (var t in triggerData)
                     triggers.Add(t);
             }
+
+            ExternalTileMapAsset = externalTileMapAsset;
         }
 
         public Map Clone()
@@ -152,7 +194,7 @@ namespace DotGameAvalonia.Models
                     copy[y, x] = tiles?[y, x];
             }
 
-            clone.InitializeFromArray(Cols, Rows, TileW, TileH, copy, characters, doodads, triggers);
+            clone.InitializeFromArray(Cols, Rows, TileW, TileH, copy, characters, doodads, triggers, ExternalTileMapAsset);
             return clone;
         }
 
@@ -318,6 +360,8 @@ namespace DotGameAvalonia.Models
             public string?[][]? map { get; set; }
             public List<CharacterDto>? characters { get; set; }
             public List<DoodadDto>? doodads { get; set; }
+            public List<TriggerDto>? triggers { get; set; }
+            public string? externalTileMapAsset { get; set; }
         }
 
         private sealed class CharacterDto
@@ -328,6 +372,7 @@ namespace DotGameAvalonia.Models
             public CharacterClass Class { get; set; } = CharacterClass.Warrior;
             public string? BehaviorScript { get; set; }
             public string? TriggerEvent { get; set; }
+            public string? Color { get; set; }
         }
 
         private sealed class DoodadDto
@@ -339,6 +384,15 @@ namespace DotGameAvalonia.Models
             public bool Interactable { get; set; } = false;
             public bool Animated { get; set; } = false;
             public string? Trigger { get; set; }
+            public string? Color { get; set; }
+            public string? OnInteract { get; set; }
+        }
+
+        private sealed class TriggerDto
+        {
+            public int TileX { get; set; }
+            public int TileY { get; set; }
+            public string? Name { get; set; }
         }
     }
 

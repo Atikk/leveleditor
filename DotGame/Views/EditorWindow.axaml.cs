@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
@@ -11,6 +13,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using DotGameAvalonia.Models;
+using DotGameAvalonia.MonoGameLayer;
 using SkiaSharp;
 using IOPath = System.IO.Path;
 
@@ -77,6 +80,8 @@ namespace DotGameAvalonia.Views
         private bool isMouseDown = false;
         private Border? selectedTileBorder = null;
     private Thread? previewThread;
+    private EditorGame? previewGame;
+    private readonly object previewGameLock = new();
 
         private Canvas? mapCanvas;
         private WrapPanel? tilePalette;
@@ -91,8 +96,13 @@ namespace DotGameAvalonia.Views
         }
 
         private EditorMode currentMode = EditorMode.Tiles;
-        private List<Character> characters = new();
-        private List<Doodad> doodads = new();
+    private List<Character> characters = new();
+    private List<Doodad> doodads = new();
+    private Character? pendingCharacterTemplate;
+    private Doodad? pendingDoodadTemplate;
+    private Character? selectedCharacter;
+    private Doodad? selectedDoodad;
+    private bool suppressGridSizeEvent;
 
         private StackPanel? TilesToolsPanel => this.FindControl<StackPanel>("TilesTools");
         private StackPanel? CharactersToolsPanel => this.FindControl<StackPanel>("CharactersTools");
@@ -129,6 +139,12 @@ namespace DotGameAvalonia.Views
             var btnLoadMap = this.FindControl<Button>("BtnLoadMap");
             var btnMonoGamePreview = this.FindControl<Button>("BtnMonoGamePreview");
             var btnSpriteEditor = this.FindControl<Button>("BtnSpriteEditor");
+            var btnTileSelect = this.FindControl<Button>("BtnTileSelect");
+            var btnTileFill = this.FindControl<Button>("BtnTileFill");
+            var btnAddCharacter = this.FindControl<Button>("BtnAddCharacter");
+            var btnEditCharacter = this.FindControl<Button>("BtnEditCharacter");
+            var btnAddDoodad = this.FindControl<Button>("BtnAddDoodad");
+            var btnEditDoodad = this.FindControl<Button>("BtnEditDoodad");
 
             if (btnLoadSpriteSheet != null)
                 btnLoadSpriteSheet.Click += BtnLoadSpriteSheet_Click;
@@ -146,6 +162,18 @@ namespace DotGameAvalonia.Views
                 btnMonoGamePreview.Click += BtnMonoGamePreview_Click;
             if (btnSpriteEditor != null)
                 btnSpriteEditor.Click += BtnSpriteEditor_Click;
+            if (btnTileSelect != null)
+                btnTileSelect.Click += BtnTileSelect_Click;
+            if (btnTileFill != null)
+                btnTileFill.Click += BtnTileFill_Click;
+            if (btnAddCharacter != null)
+                btnAddCharacter.Click += BtnAddCharacter_Click;
+            if (btnEditCharacter != null)
+                btnEditCharacter.Click += BtnEditCharacter_Click;
+            if (btnAddDoodad != null)
+                btnAddDoodad.Click += BtnAddDoodad_Click;
+            if (btnEditDoodad != null)
+                btnEditDoodad.Click += BtnEditDoodad_Click;
             
             if (cmbGridSize != null)
                 cmbGridSize.SelectionChanged += CmbGridSize_SelectionChanged;
@@ -350,6 +378,9 @@ namespace DotGameAvalonia.Views
 
         private void CmbGridSize_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
+            if (suppressGridSizeEvent)
+                return;
+
             if (cmbGridSize?.SelectedItem is ComboBoxItem item)
             {
                 gridSize = int.Parse(item.Content?.ToString() ?? "20");
@@ -368,33 +399,29 @@ namespace DotGameAvalonia.Views
 
         private async void BtnSaveMap_Click(object? sender, RoutedEventArgs e)
         {
-            var dialog = new Window
+            try
             {
-                Title = "Save Map",
-                Width = 400,
-                Height = 150,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner
-            };
+                SyncMapFromEditorState();
 
-            var stack = new StackPanel { Margin = new Thickness(20), Spacing = 10 };
-            stack.Children.Add(new TextBlock { Text = "Save map to:" });
-            var txtPath = new TextBox { Text = "maps/mymap.json" };
-            stack.Children.Add(txtPath);
+                var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+                {
+                    Title = "Save Map",
+                    SuggestedFileName = "mymap.json",
+                    FileTypeChoices = new List<FilePickerFileType>
+                    {
+                        new FilePickerFileType("JSON Map") { Patterns = new[] { "*.json" } }
+                    }
+                });
 
-            var btnPanel = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, Spacing = 10 };
-            var btnOk = new Button { Content = "Save", Width = 80 };
-            var btnCancel = new Button { Content = "Cancel", Width = 80 };
-            btnPanel.Children.Add(btnOk);
-            btnPanel.Children.Add(btnCancel);
-            stack.Children.Add(btnPanel);
+                if (file == null)
+                    return;
 
-            dialog.Content = stack;
-
-            btnOk.Click += (s, ev) =>
-            {
-                var path = txtPath.Text ?? "maps/mymap.json";
-                if (!IOPath.IsPathRooted(path))
-                    path = IOPath.Combine("/home/runner/workspace", path);
+                var path = file.Path?.LocalPath;
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    Console.WriteLine("Error: Unable to resolve the selected save path.");
+                    return;
+                }
 
                 System.IO.Directory.CreateDirectory(IOPath.GetDirectoryName(path) ?? ".");
 
@@ -412,121 +439,144 @@ namespace DotGameAvalonia.Views
                     }
                 }
 
+                var characterData = characters.Select(c => new
+                {
+                    TileX = c.TileX,
+                    TileY = c.TileY,
+                    Name = c.Name,
+                    Class = c.Class,
+                    BehaviorScript = c.BehaviorScript,
+                    TriggerEvent = c.TriggerEvent,
+                    Color = c.Color.ToString()
+                }).ToList();
+
+                var doodadData = doodads.Select(d => new
+                {
+                    TileX = d.TileX,
+                    TileY = d.TileY,
+                    Type = d.Type,
+                    Collidable = d.Collidable,
+                    Interactable = d.Interactable,
+                    Animated = d.Animated,
+                    Trigger = d.Trigger,
+                    Color = d.Color.ToString(),
+                    OnInteract = d.OnInteract
+                }).ToList();
+
+                var triggerData = map.Triggers.Select(t => new
+                {
+                    TileX = t.TileX,
+                    TileY = t.TileY,
+                    Name = t.Name
+                }).ToList();
+
                 var mapObject = new
                 {
                     cols = gridSize,
                     rows = gridSize,
                     tileW = tw,
                     tileH = th,
-                    map = mapArray
+                    map = mapArray,
+                    characters = characterData,
+                    doodads = doodadData,
+                    triggers = triggerData,
+                    externalTileMapAsset = map.ExternalTileMapAsset
                 };
 
                 var options = new JsonSerializerOptions { WriteIndented = true };
                 System.IO.File.WriteAllText(path, JsonSerializer.Serialize(mapObject, options));
-                dialog.Close();
-            };
-            btnCancel.Click += (s, ev) => dialog.Close();
-
-            await dialog.ShowDialog(this);
+                Console.WriteLine($"Map saved to {path}.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error saving map: {ex.Message}");
+            }
         }
 
         private async void BtnLoadMap_Click(object? sender, RoutedEventArgs e)
         {
-            var dialog = new Window
+            try
             {
-                Title = "Load Map",
-                Width = 400,
-                Height = 150,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner
-            };
-
-            var stack = new StackPanel { Margin = new Thickness(20), Spacing = 10 };
-            stack.Children.Add(new TextBlock { Text = "Load map from:" });
-            var txtPath = new TextBox { Text = "maps/sample.json" };
-            stack.Children.Add(txtPath);
-
-            var btnPanel = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, Spacing = 10 };
-            var btnOk = new Button { Content = "Load", Width = 80 };
-            var btnCancel = new Button { Content = "Cancel", Width = 80 };
-            btnPanel.Children.Add(btnOk);
-            btnPanel.Children.Add(btnCancel);
-            stack.Children.Add(btnPanel);
-
-            dialog.Content = stack;
-
-            btnOk.Click += (s, ev) =>
-            {
-                var inputPath = txtPath.Text ?? string.Empty;
-                var baseDir = AppContext.BaseDirectory ?? Environment.CurrentDirectory;
-                var fullPath = IOPath.IsPathRooted(inputPath)
-                    ? inputPath
-                    : IOPath.Combine(baseDir, inputPath);
-
-                if (!System.IO.File.Exists(fullPath))
+                var results = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
                 {
-                    Console.WriteLine($"Error: Map file not found at {fullPath}.");
+                    Title = "Load Map",
+                    AllowMultiple = false,
+                    FileTypeFilter = new List<FilePickerFileType>
+                    {
+                        new FilePickerFileType("JSON Map") { Patterns = new[] { "*.json" } },
+                        new FilePickerFileType("All Files") { Patterns = new[] { "*.*" } }
+                    }
+                });
+
+                if (results == null || results.Count == 0)
+                    return;
+
+                var path = results[0].Path?.LocalPath;
+                if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
+                {
+                    Console.WriteLine("Error: Selected map file could not be resolved.");
                     return;
                 }
 
-                try
+                var loadedMap = Map.LoadFromJson(path);
+                map = loadedMap;
+
+                gridSize = Math.Max(1, map.Cols);
+                mapData = new TileEntry?[gridSize, gridSize];
+
+                var mapDirectory = IOPath.GetDirectoryName(path) ?? AppContext.BaseDirectory ?? Environment.CurrentDirectory;
+
+                for (int y = 0; y < gridSize; y++)
                 {
-                    var loadedMap = Map.LoadFromJson(fullPath);
-                    map = loadedMap;
-
-                    gridSize = map.Cols;
-                    mapData = new TileEntry?[gridSize, gridSize];
-
-                    var mapDirectory = IOPath.GetDirectoryName(fullPath) ?? baseDir;
-
-                    for (int y = 0; y < gridSize; y++)
+                    for (int x = 0; x < gridSize; x++)
                     {
-                        for (int x = 0; x < gridSize; x++)
-                        {
-                            var stored = map.GetTileDataUrl(x, y);
-                            if (string.IsNullOrWhiteSpace(stored))
-                                continue;
+                        var stored = map.GetTileDataUrl(x, y);
+                        if (string.IsNullOrWhiteSpace(stored))
+                            continue;
 
-                            if (stored.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                        if (stored.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                        {
+                            mapData[x, y] = TileEntry.FromDataUrl(stored);
+                        }
+                        else
+                        {
+                            var resolved = IOPath.IsPathRooted(stored)
+                                ? stored
+                                : IOPath.Combine(mapDirectory, stored);
+
+                            if (System.IO.File.Exists(resolved))
                             {
-                                mapData[x, y] = TileEntry.FromDataUrl(stored);
+                                mapData[x, y] = new TileEntry(new Bitmap(resolved), resolved, null, stored);
                             }
                             else
                             {
-                                var resolved = IOPath.IsPathRooted(stored)
-                                    ? stored
-                                    : IOPath.Combine(mapDirectory, stored);
-
-                                if (System.IO.File.Exists(resolved))
-                                {
-                                    mapData[x, y] = new TileEntry(new Bitmap(resolved), resolved, null, stored);
-                                }
-                                else
-                                {
-                                    Console.WriteLine($"Warning: Tile asset not found at {resolved}.");
-                                    mapData[x, y] = null;
-                                }
+                                Console.WriteLine($"Warning: Tile asset not found at {resolved}.");
+                                mapData[x, y] = null;
                             }
                         }
                     }
-
-                    characters = new List<Character>(map.Characters);
-                    doodads = new List<Doodad>(map.Doodads);
-
-                    if (numTileWidth != null) numTileWidth.Value = map.TileW;
-                    if (numTileHeight != null) numTileHeight.Value = map.TileH;
-
-                    SyncMapFromEditorState();
-                    RenderMap();
-                    dialog.Close();
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error loading map: {ex.Message}");
-                }
-            };
-            btnCancel.Click += (s, ev) => dialog.Close();
 
-            await dialog.ShowDialog(this);
+                characters = map.Characters.Select(CloneCharacterForEditor).ToList();
+                doodads = map.Doodads.Select(CloneDoodadForEditor).ToList();
+                selectedCharacter = null;
+                selectedDoodad = null;
+                pendingCharacterTemplate = null;
+                pendingDoodadTemplate = null;
+
+                if (numTileWidth != null) numTileWidth.Value = map.TileW;
+                if (numTileHeight != null) numTileHeight.Value = map.TileH;
+
+                UpdateGridSizeSelection(gridSize);
+
+                SyncMapFromEditorState();
+                RenderMap();
+                Console.WriteLine($"Loaded map from {path}.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading map: {ex.Message}");
+            }
         }
 
         private async void BtnSpriteEditor_Click(object? sender, RoutedEventArgs e)
@@ -559,10 +609,40 @@ namespace DotGameAvalonia.Views
         private void PaintAtPosition(Point location, bool erase)
         {
             if (mapCanvas == null) return;
-            
-            float cellSize = (float)Math.Min(mapCanvas.Bounds.Width, mapCanvas.Bounds.Height) / gridSize;
-            int gridX = (int)(location.X / cellSize);
-            int gridY = (int)(location.Y / cellSize);
+
+            float cellSize = mapCanvas.Width > 0 ? (float)mapCanvas.Width / gridSize : 600f / gridSize;
+            int gridX = Math.Clamp((int)(location.X / cellSize), 0, gridSize - 1);
+            int gridY = Math.Clamp((int)(location.Y / cellSize), 0, gridSize - 1);
+
+            switch (currentMode)
+            {
+                case EditorMode.Tiles:
+                    PaintTiles(gridX, gridY, erase);
+                    RenderMap();
+                    break;
+                case EditorMode.Characters:
+                    HandleCharacterPlacement(gridX, gridY, erase);
+                    RenderMap();
+                    SyncMapFromEditorState();
+                    break;
+                case EditorMode.Doodads:
+                    HandleDoodadPlacement(gridX, gridY, erase);
+                    RenderMap();
+                    SyncMapFromEditorState();
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        private void PaintTiles(int gridX, int gridY, bool erase)
+        {
+            if (!erase && selectedTile == null)
+            {
+                Console.WriteLine("Select a tile from the palette before painting.");
+                return;
+            }
+
             int offset = brushSize / 2;
 
             for (int dy = 0; dy < brushSize; dy++)
@@ -573,18 +653,509 @@ namespace DotGameAvalonia.Views
                     int y = gridY - offset + dy;
                     if (x >= 0 && y >= 0 && x < gridSize && y < gridSize)
                     {
-                        if (!erase && selectedTile != null)
-                        {
-                            mapData[x, y] = selectedTile.Clone();
-                        }
-                        else
+                        if (erase)
                         {
                             mapData[x, y] = null;
+                        }
+                        else if (selectedTile != null)
+                        {
+                            mapData[x, y] = selectedTile.Clone();
                         }
                     }
                 }
             }
+        }
+
+        private void HandleCharacterPlacement(int tileX, int tileY, bool erase)
+        {
+            if (erase)
+            {
+                if (!RemoveCharacterAt(tileX, tileY))
+                {
+                    Console.WriteLine($"No character present at ({tileX}, {tileY}).");
+                }
+                return;
+            }
+
+            if (pendingCharacterTemplate == null)
+            {
+                var existing = GetCharacterAt(tileX, tileY);
+                if (existing != null)
+                {
+                    selectedCharacter = existing;
+                    Console.WriteLine($"Selected character {existing.Name} at ({tileX}, {tileY}).");
+                }
+                else
+                {
+                    Console.WriteLine("No character template selected. Use Add Character to create one.");
+                }
+                return;
+            }
+
+            var placement = CloneCharacterTemplate(pendingCharacterTemplate);
+            placement.TileX = tileX;
+            placement.TileY = tileY;
+
+            RemoveCharacterAt(tileX, tileY);
+            characters.Add(placement);
+            selectedCharacter = placement;
+            Console.WriteLine($"Placed character {placement.Name} at ({tileX}, {tileY}).");
+        }
+
+        private void HandleDoodadPlacement(int tileX, int tileY, bool erase)
+        {
+            if (erase)
+            {
+                if (!RemoveDoodadAt(tileX, tileY))
+                {
+                    Console.WriteLine($"No doodad present at ({tileX}, {tileY}).");
+                }
+                return;
+            }
+
+            if (pendingDoodadTemplate == null)
+            {
+                var existing = GetDoodadAt(tileX, tileY);
+                if (existing != null)
+                {
+                    selectedDoodad = existing;
+                    Console.WriteLine($"Selected doodad {existing.Type} at ({tileX}, {tileY}).");
+                }
+                else
+                {
+                    Console.WriteLine("No doodad template selected. Use Add Doodad to create one.");
+                }
+                return;
+            }
+
+            var placement = CloneDoodadTemplate(pendingDoodadTemplate);
+            placement.TileX = tileX;
+            placement.TileY = tileY;
+
+            RemoveDoodadAt(tileX, tileY);
+            doodads.Add(placement);
+            selectedDoodad = placement;
+            Console.WriteLine($"Placed doodad {placement.Type} at ({tileX}, {tileY}).");
+        }
+
+        private Character? GetCharacterAt(int tileX, int tileY)
+        {
+            return characters.FirstOrDefault(c => c.TileX == tileX && c.TileY == tileY);
+        }
+
+        private bool RemoveCharacterAt(int tileX, int tileY)
+        {
+            var existing = GetCharacterAt(tileX, tileY);
+            if (existing == null)
+                return false;
+
+            RemoveCharacter(existing);
+            if (ReferenceEquals(selectedCharacter, existing))
+                selectedCharacter = null;
+            return true;
+        }
+
+        private Doodad? GetDoodadAt(int tileX, int tileY)
+        {
+            return doodads.FirstOrDefault(d => d.TileX == tileX && d.TileY == tileY);
+        }
+
+        private bool RemoveDoodadAt(int tileX, int tileY)
+        {
+            var existing = GetDoodadAt(tileX, tileY);
+            if (existing == null)
+                return false;
+
+            RemoveDoodad(existing);
+            if (ReferenceEquals(selectedDoodad, existing))
+                selectedDoodad = null;
+            return true;
+        }
+
+        private Character CloneCharacterTemplate(Character template)
+        {
+            var clone = new Character(template.TileX, template.TileY, template.Class, template.Name)
+            {
+                Sprite = template.Sprite,
+                Color = template.Color,
+                BehaviorScript = template.BehaviorScript,
+                TriggerEvent = template.TriggerEvent
+            };
+            clone.Direction = template.Direction;
+            clone.CurrentHP = template.CurrentHP;
+            return clone;
+        }
+
+        private Character CloneCharacterForEditor(Character source)
+        {
+            var clone = CloneCharacterTemplate(source);
+            clone.TileX = source.TileX;
+            clone.TileY = source.TileY;
+            return clone;
+        }
+
+        private Doodad CloneDoodadTemplate(Doodad template)
+        {
+            return new Doodad(template.TileX, template.TileY, template.Type)
+            {
+                Sprite = template.Sprite,
+                Color = template.Color,
+                Collidable = template.Collidable,
+                Interactable = template.Interactable,
+                Animated = template.Animated,
+                Trigger = template.Trigger,
+                OnInteract = template.OnInteract
+            };
+        }
+
+        private Doodad CloneDoodadForEditor(Doodad source)
+        {
+            var clone = CloneDoodadTemplate(source);
+            clone.TileX = source.TileX;
+            clone.TileY = source.TileY;
+            return clone;
+        }
+
+        private static Color ParseColorOrDefault(string? value, Color fallback)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return fallback;
+
+            try
+            {
+                return Color.Parse(value);
+            }
+            catch
+            {
+                return fallback;
+            }
+        }
+
+        private void UpdateGridSizeSelection(int size)
+        {
+            if (cmbGridSize == null)
+                return;
+
+            var match = cmbGridSize.Items?.OfType<ComboBoxItem>().FirstOrDefault(item =>
+                int.TryParse(item.Content?.ToString(), out var parsed) && parsed == size);
+
+            if (match != null)
+            {
+                suppressGridSizeEvent = true;
+                cmbGridSize.SelectedItem = match;
+                suppressGridSizeEvent = false;
+            }
+        }
+
+        private async Task<Character?> PromptCharacterTemplateAsync()
+        {
+            var dialog = new CharacterCreationWindow();
+            var result = await dialog.ShowDialog<bool?>(this);
+            if (result != true)
+                return null;
+
+            var name = string.IsNullOrWhiteSpace(dialog.SelectedName) ? "Hero" : dialog.SelectedName!;
+            var character = new Character(0, 0, dialog.SelectedClass, name)
+            {
+                Sprite = dialog.SelectedSprite,
+                Color = dialog.SelectedSprite != null ? Colors.Transparent : Colors.DeepSkyBlue
+            };
+            return character;
+        }
+
+        private async Task<(Character? character, bool delete)> PromptCharacterEditAsync(Character target)
+        {
+            var dialog = new Window
+            {
+                Title = "Edit Character",
+                Width = 360,
+                Height = 360,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            };
+
+            var stack = new StackPanel { Margin = new Thickness(20), Spacing = 10 };
+            stack.Children.Add(new TextBlock { Text = "Name" });
+            var nameBox = new TextBox { Text = target.Name };
+            stack.Children.Add(nameBox);
+
+            stack.Children.Add(new TextBlock { Text = "Class" });
+            var classCombo = new ComboBox();
+            classCombo.ItemsSource = Enum.GetValues(typeof(CharacterClass));
+            classCombo.SelectedItem = target.Class;
+            stack.Children.Add(classCombo);
+
+            stack.Children.Add(new TextBlock { Text = "Color (#AARRGGBB)" });
+            var colorBox = new TextBox { Text = target.Color.ToString() };
+            stack.Children.Add(colorBox);
+
+            stack.Children.Add(new TextBlock { Text = "Trigger Event" });
+            var triggerBox = new TextBox { Text = target.TriggerEvent ?? string.Empty };
+            stack.Children.Add(triggerBox);
+
+            stack.Children.Add(new TextBlock { Text = "Behavior Script" });
+            var scriptBox = new TextBox { Text = target.BehaviorScript ?? string.Empty };
+            stack.Children.Add(scriptBox);
+
+            var buttonPanel = new StackPanel
+            {
+                Orientation = Avalonia.Layout.Orientation.Horizontal,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                Spacing = 10
+            };
+            var saveButton = new Button { Content = "Save", Width = 80 };
+            var deleteButton = new Button { Content = "Delete", Width = 80 };
+            var cancelButton = new Button { Content = "Cancel", Width = 80 };
+            buttonPanel.Children.Add(saveButton);
+            buttonPanel.Children.Add(deleteButton);
+            buttonPanel.Children.Add(cancelButton);
+            stack.Children.Add(buttonPanel);
+
+            dialog.Content = stack;
+
+            Character? updated = null;
+            bool deleteRequested = false;
+
+            saveButton.Click += (_, __) =>
+            {
+                var selectedClass = classCombo.SelectedItem is CharacterClass cls ? cls : target.Class;
+                var name = string.IsNullOrWhiteSpace(nameBox.Text) ? target.Name : nameBox.Text!;
+                var clone = new Character(target.TileX, target.TileY, selectedClass, name)
+                {
+                    Sprite = target.Sprite,
+                    Color = ParseColorOrDefault(colorBox.Text, target.Color),
+                    BehaviorScript = string.IsNullOrWhiteSpace(scriptBox.Text) ? null : scriptBox.Text,
+                    TriggerEvent = string.IsNullOrWhiteSpace(triggerBox.Text) ? null : triggerBox.Text
+                };
+                clone.Direction = target.Direction;
+                clone.CurrentHP = Math.Min(target.CurrentHP, clone.Attributes.MaxHP);
+                updated = clone;
+                dialog.Close();
+            };
+
+            deleteButton.Click += (_, __) =>
+            {
+                deleteRequested = true;
+                dialog.Close();
+            };
+
+            cancelButton.Click += (_, __) => dialog.Close();
+
+            await dialog.ShowDialog(this);
+            return (updated, deleteRequested);
+        }
+
+        private async Task<Doodad?> PromptDoodadTemplateAsync()
+        {
+            var (doodad, _) = await PromptDoodadEditAsync(null);
+            return doodad;
+        }
+
+        private async Task<(Doodad? doodad, bool delete)> PromptDoodadEditAsync(Doodad? target)
+        {
+            var dialog = new Window
+            {
+                Title = target == null ? "Add Doodad" : "Edit Doodad",
+                Width = 360,
+                Height = 340,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            };
+
+            var stack = new StackPanel { Margin = new Thickness(20), Spacing = 10 };
+            stack.Children.Add(new TextBlock { Text = "Type" });
+            var typeBox = new TextBox { Text = target?.Type ?? "Doodad" };
+            stack.Children.Add(typeBox);
+
+            stack.Children.Add(new TextBlock { Text = "Color (#AARRGGBB)" });
+            var colorBox = new TextBox { Text = (target?.Color ?? Colors.Transparent).ToString() };
+            stack.Children.Add(colorBox);
+
+            var collidableBox = new CheckBox { Content = "Collidable", IsChecked = target?.Collidable ?? false };
+            stack.Children.Add(collidableBox);
+
+            var interactableBox = new CheckBox { Content = "Interactable", IsChecked = target?.Interactable ?? false };
+            stack.Children.Add(interactableBox);
+
+            var animatedBox = new CheckBox { Content = "Animated", IsChecked = target?.Animated ?? false };
+            stack.Children.Add(animatedBox);
+
+            stack.Children.Add(new TextBlock { Text = "Trigger" });
+            var triggerBox = new TextBox { Text = target?.Trigger ?? string.Empty };
+            stack.Children.Add(triggerBox);
+
+            var buttonPanel = new StackPanel
+            {
+                Orientation = Avalonia.Layout.Orientation.Horizontal,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                Spacing = 10
+            };
+            var saveButton = new Button { Content = "Save", Width = 80 };
+            var deleteButton = new Button { Content = "Delete", Width = 80, IsVisible = target != null };
+            var cancelButton = new Button { Content = "Cancel", Width = 80 };
+            buttonPanel.Children.Add(saveButton);
+            if (target != null) buttonPanel.Children.Add(deleteButton);
+            buttonPanel.Children.Add(cancelButton);
+            stack.Children.Add(buttonPanel);
+
+            dialog.Content = stack;
+
+            Doodad? updated = null;
+            bool deleteRequested = false;
+
+            saveButton.Click += (_, __) =>
+            {
+                var type = string.IsNullOrWhiteSpace(typeBox.Text) ? (target?.Type ?? "Doodad") : typeBox.Text!;
+                var doodad = new Doodad(target?.TileX ?? 0, target?.TileY ?? 0, type)
+                {
+                    Sprite = target?.Sprite,
+                    Color = ParseColorOrDefault(colorBox.Text, target?.Color ?? Colors.Transparent),
+                    Collidable = collidableBox.IsChecked ?? false,
+                    Interactable = interactableBox.IsChecked ?? false,
+                    Animated = animatedBox.IsChecked ?? false,
+                    Trigger = string.IsNullOrWhiteSpace(triggerBox.Text) ? null : triggerBox.Text,
+                    OnInteract = target?.OnInteract
+                };
+                updated = doodad;
+                dialog.Close();
+            };
+
+            deleteButton.Click += (_, __) =>
+            {
+                deleteRequested = true;
+                dialog.Close();
+            };
+
+            cancelButton.Click += (_, __) => dialog.Close();
+
+            await dialog.ShowDialog(this);
+            return (updated, deleteRequested);
+        }
+
+        private void BtnTileSelect_Click(object? sender, RoutedEventArgs e)
+        {
+            SwitchToTilesMode(sender, e);
+            if (selectedTile == null && tiles.Count > 0)
+            {
+                selectedTile = tiles[0];
+                if (tilePalette?.Children.Count > 0 && tilePalette.Children[0] is Border border)
+                {
+                    if (selectedTileBorder != null)
+                        selectedTileBorder.Background = Brushes.Transparent;
+                    border.Background = Brushes.LightBlue;
+                    selectedTileBorder = border;
+                }
+            }
+            Console.WriteLine("Tile painting mode enabled. Select a tile from the palette to change the brush.");
+        }
+
+        private void BtnTileFill_Click(object? sender, RoutedEventArgs e)
+        {
+            if (selectedTile == null)
+            {
+                Console.WriteLine("Select a tile before using Fill Area.");
+                return;
+            }
+
+            for (int y = 0; y < gridSize; y++)
+            {
+                for (int x = 0; x < gridSize; x++)
+                {
+                    mapData[x, y] = selectedTile.Clone();
+                }
+            }
+
             RenderMap();
+            Console.WriteLine("Filled the entire map with the current tile selection.");
+            SyncMapFromEditorState();
+        }
+
+        private async void BtnAddCharacter_Click(object? sender, RoutedEventArgs e)
+        {
+            var template = await PromptCharacterTemplateAsync();
+            if (template == null)
+                return;
+
+            pendingCharacterTemplate = CloneCharacterTemplate(template);
+            SwitchToCharactersMode(sender, e);
+            Console.WriteLine("Character template ready. Left click on the map to place it.");
+        }
+
+        private async void BtnEditCharacter_Click(object? sender, RoutedEventArgs e)
+        {
+            if (characters.Count == 0)
+            {
+                Console.WriteLine("There are no characters to edit.");
+                return;
+            }
+
+            var target = selectedCharacter ?? characters[0];
+            var (updated, delete) = await PromptCharacterEditAsync(target);
+
+            if (delete)
+            {
+                characters.Remove(target);
+                if (ReferenceEquals(selectedCharacter, target))
+                    selectedCharacter = null;
+                Console.WriteLine($"Deleted character {target.Name}.");
+            }
+            else if (updated != null)
+            {
+                var index = characters.IndexOf(target);
+                if (index >= 0)
+                {
+                    characters[index] = updated;
+                    selectedCharacter = updated;
+                    Console.WriteLine($"Updated character {updated.Name}.");
+                }
+            }
+
+            RenderMap();
+            SyncMapFromEditorState();
+        }
+
+        private async void BtnAddDoodad_Click(object? sender, RoutedEventArgs e)
+        {
+            var doodad = await PromptDoodadTemplateAsync();
+            if (doodad == null)
+                return;
+
+            pendingDoodadTemplate = CloneDoodadTemplate(doodad);
+            SwitchToDoodadsMode(sender, e);
+            Console.WriteLine("Doodad template ready. Left click on the map to place it.");
+        }
+
+        private async void BtnEditDoodad_Click(object? sender, RoutedEventArgs e)
+        {
+            if (doodads.Count == 0)
+            {
+                Console.WriteLine("There are no doodads to edit.");
+                return;
+            }
+
+            var target = selectedDoodad ?? doodads[0];
+            var (updated, delete) = await PromptDoodadEditAsync(target);
+
+            if (delete)
+            {
+                doodads.Remove(target);
+                if (ReferenceEquals(selectedDoodad, target))
+                    selectedDoodad = null;
+                Console.WriteLine($"Deleted doodad {target.Type}.");
+            }
+            else if (updated != null)
+            {
+                updated.TileX = target.TileX;
+                updated.TileY = target.TileY;
+                var index = doodads.IndexOf(target);
+                if (index >= 0)
+                {
+                    doodads[index] = updated;
+                    selectedDoodad = updated;
+                    Console.WriteLine($"Updated doodad {updated.Type}.");
+                }
+            }
+
+            RenderMap();
+            SyncMapFromEditorState();
         }
 
         private void SwitchMode(EditorMode mode)
@@ -698,7 +1269,8 @@ namespace DotGameAvalonia.Views
             }
 
             var triggerSnapshot = new List<BehaviorTrigger>(map.Triggers);
-            map.InitializeFromArray(gridSize, gridSize, tileW, tileH, tilesSnapshot, characters, doodads, triggerSnapshot);
+            map.InitializeFromArray(gridSize, gridSize, tileW, tileH, tilesSnapshot, characters, doodads, triggerSnapshot, map.ExternalTileMapAsset);
+            NotifyPreviewMapUpdate();
         }
 
         private void BtnMonoGamePreview_Click(object? sender, RoutedEventArgs e)
@@ -719,10 +1291,21 @@ namespace DotGameAvalonia.Views
 
             previewThread = new Thread(() =>
             {
+                EditorGame? localGame = null;
                 try
                 {
-                    using var game = new DotGameAvalonia.MonoGameLayer.EditorGame(previewMap);
-                    game.Run();
+                    localGame = new EditorGame(previewMap);
+                    localGame.TriggerActivated += (trigger, entity) =>
+                    {
+                        var triggerName = string.IsNullOrWhiteSpace(trigger.Name) ? "UnnamedTrigger" : trigger.Name;
+                        Console.WriteLine($"[Preview] Trigger '{triggerName}' fired by '{entity.Name}'.");
+                    };
+                    lock (previewGameLock)
+                    {
+                        previewGame = localGame;
+                    }
+
+                    localGame.Run();
                 }
                 catch (Exception ex)
                 {
@@ -730,6 +1313,11 @@ namespace DotGameAvalonia.Views
                 }
                 finally
                 {
+                    localGame?.Dispose();
+                    lock (previewGameLock)
+                    {
+                        previewGame = null;
+                    }
                     previewThread = null;
                 }
             })
@@ -739,6 +1327,28 @@ namespace DotGameAvalonia.Views
             };
 
             previewThread.Start();
+        }
+
+        private void NotifyPreviewMapUpdate()
+        {
+            EditorGame? game;
+            lock (previewGameLock)
+            {
+                game = previewGame;
+            }
+
+            if (game == null)
+                return;
+
+            try
+            {
+                var snapshot = map.Clone();
+                game.RequestMapSwap(snapshot);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"MonoGame preview sync error: {ex.Message}");
+            }
         }
 
         private SKBitmap BitmapToSKBitmap(Bitmap bitmap)
@@ -759,29 +1369,29 @@ namespace DotGameAvalonia.Views
 
         private void SwitchToTilesMode(object? sender, RoutedEventArgs e)
         {
-            if (sender == null) return;
             currentMode = EditorMode.Tiles;
             if (TilesToolsPanel != null) TilesToolsPanel.IsVisible = true;
             if (CharactersToolsPanel != null) CharactersToolsPanel.IsVisible = false;
             if (DoodadsToolsPanel != null) DoodadsToolsPanel.IsVisible = false;
+            RenderMap();
         }
 
         private void SwitchToCharactersMode(object? sender, RoutedEventArgs e)
         {
-            if (sender == null) return;
             currentMode = EditorMode.Characters;
             if (TilesToolsPanel != null) TilesToolsPanel.IsVisible = false;
             if (CharactersToolsPanel != null) CharactersToolsPanel.IsVisible = true;
             if (DoodadsToolsPanel != null) DoodadsToolsPanel.IsVisible = false;
+            RenderMap();
         }
 
         private void SwitchToDoodadsMode(object? sender, RoutedEventArgs e)
         {
-            if (sender == null) return;
             currentMode = EditorMode.Doodads;
             if (TilesToolsPanel != null) TilesToolsPanel.IsVisible = false;
             if (CharactersToolsPanel != null) CharactersToolsPanel.IsVisible = false;
             if (DoodadsToolsPanel != null) DoodadsToolsPanel.IsVisible = true;
+            RenderMap();
         }
 
         private void PlaceCharacter(int tileX, int tileY, Character character)

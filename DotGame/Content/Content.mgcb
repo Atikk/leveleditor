@@ -1,0 +1,14 @@
+#-----------------------------
+# Content Pipeline Configuration
+#-----------------------------
+
+/outputDir:bin/$(Platform)/Content
+/intermediateDir:obj/$(Platform)/$(Configuration)/Content
+/platform:DesktopGL
+/config:$(Configuration)
+/profile:Reach
+/compress:False
+
+#----------------------------------
+# MonoGame Content References
+#----------------------------------

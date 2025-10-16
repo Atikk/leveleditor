@@ -78,22 +78,22 @@
                     <!-- Tiles Tools -->
                     <StackPanel x:Name="TilesTools" IsVisible="True">
                         <TextBlock Text="Tile Tools" FontWeight="Bold" Margin="0,0,0,5" />
-                        <Button Content="Select Tile" Margin="0,5" Width="200" />
-                        <Button Content="Fill Area" Margin="0,5" Width="200" />
+                        <Button Name="BtnTileSelect" Content="Select Tile" Margin="0,5" Width="200" />
+                        <Button Name="BtnTileFill" Content="Fill Area" Margin="0,5" Width="200" />
                     </StackPanel>
 
                     <!-- Characters Tools -->
                     <StackPanel x:Name="CharactersTools" IsVisible="False">
                         <TextBlock Text="Character Tools" FontWeight="Bold" Margin="0,0,0,5" />
-                        <Button Content="Add Character" Margin="0,5" Width="200" />
-                        <Button Content="Edit Character" Margin="0,5" Width="200" />
+                        <Button Name="BtnAddCharacter" Content="Add Character" Margin="0,5" Width="200" />
+                        <Button Name="BtnEditCharacter" Content="Edit Character" Margin="0,5" Width="200" />
                     </StackPanel>
 
                     <!-- Doodads Tools -->
                     <StackPanel x:Name="DoodadsTools" IsVisible="False">
                         <TextBlock Text="Doodad Tools" FontWeight="Bold" Margin="0,0,0,5" />
-                        <Button Content="Add Doodad" Margin="0,5" Width="200" />
-                        <Button Content="Edit Doodad" Margin="0,5" Width="200" />
+                        <Button Name="BtnAddDoodad" Content="Add Doodad" Margin="0,5" Width="200" />
+                        <Button Name="BtnEditDoodad" Content="Edit Doodad" Margin="0,5" Width="200" />
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>
