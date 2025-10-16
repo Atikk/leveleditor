@@ -2,40 +2,197 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="DotGameAvalonia.Views.GameWindow"
         Title="DotGame – Play Test"
-        Width="850" Height="650"
+        Width="900" Height="700"
         WindowStartupLocation="CenterScreen"
-        CanResize="True">
+        CanResize="True"
+        Background="#1F2937">
     
-    <Grid Background="White">
-        <Canvas Name="GameCanvas" Background="White" />
+    <Grid Background="#1F2937">
+        <Canvas Name="GameCanvas" Background="#1F2937" />
         
-        <Border Name="CombatUI" IsVisible="False" Background="#F0F0F0" Padding="20"
-                HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,50">
-            <StackPanel Spacing="10" MinWidth="400">
-                <TextBlock Name="TxtCombatMessage" Text="Combat!" Foreground="Black" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" />
+        <!-- Combat UI Overlay -->
+        <Border Name="CombatUI" 
+                IsVisible="False" 
+                Background="White"
+                CornerRadius="16"
+                Padding="28"
+                HorizontalAlignment="Center" 
+                VerticalAlignment="Bottom" 
+                Margin="0,0,0,60"
+                MinWidth="500"
+                MaxWidth="650"
+                BorderBrush="#E5E7EB"
+                BorderThickness="2">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="30" 
+                                  Color="#000000" 
+                                  Opacity="0.25"
+                                  OffsetY="8" />
+            </Border.Effect>
+            
+            <StackPanel Spacing="18">
+                <!-- Combat Header -->
+                <TextBlock Name="TxtCombatMessage" 
+                           Text="⚔️ Battle!" 
+                           Foreground="#111827" 
+                           FontSize="24" 
+                           FontWeight="ExtraBold" 
+                           HorizontalAlignment="Center" />
                 
-                <Grid ColumnDefinitions="*,*">
-                    <StackPanel Grid.Column="0" Spacing="5">
-                        <TextBlock Name="TxtPlayerInfo" Foreground="Black" FontSize="14" />
-                        <ProgressBar Name="BarPlayerHP" Height="20" Minimum="0" Maximum="100" Value="100" Foreground="Green" />
-                    </StackPanel>
+                <!-- Health Bars Section -->
+                <Grid ColumnDefinitions="*,20,*" Margin="0,4,0,0">
+                    <!-- Player Stats -->
+                    <Border Grid.Column="0" 
+                            Background="#DBEAFE"
+                            CornerRadius="12"
+                            Padding="16,14"
+                            BorderBrush="#93C5FD"
+                            BorderThickness="2">
+                        <StackPanel Spacing="8">
+                            <TextBlock Name="TxtPlayerInfo" 
+                                       Foreground="#1E40AF" 
+                                       FontSize="15"
+                                       FontWeight="Bold" />
+                            <Border Background="White"
+                                    CornerRadius="8"
+                                    BorderBrush="#93C5FD"
+                                    BorderThickness="1"
+                                    Padding="2">
+                                <ProgressBar Name="BarPlayerHP" 
+                                             Height="24" 
+                                             Minimum="0" 
+                                             Maximum="100" 
+                                             Value="100" 
+                                             Foreground="#10B981"
+                                             Background="#F3F4F6"
+                                             CornerRadius="6" />
+                            </Border>
+                        </StackPanel>
+                    </Border>
                     
-                    <StackPanel Grid.Column="1" Spacing="5">
-                        <TextBlock Name="TxtEnemyInfo" Foreground="Black" FontSize="14" HorizontalAlignment="Right" />
-                        <ProgressBar Name="BarEnemyHP" Height="20" Minimum="0" Maximum="100" Value="100" Foreground="Red" />
-                    </StackPanel>
+                    <!-- VS Indicator -->
+                    <TextBlock Grid.Column="1"
+                               Text="VS"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="#9CA3AF"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                    
+                    <!-- Enemy Stats -->
+                    <Border Grid.Column="2" 
+                            Background="#FEE2E2"
+                            CornerRadius="12"
+                            Padding="16,14"
+                            BorderBrush="#FCA5A5"
+                            BorderThickness="2">
+                        <StackPanel Spacing="8">
+                            <TextBlock Name="TxtEnemyInfo" 
+                                       Foreground="#991B1B" 
+                                       FontSize="15"
+                                       FontWeight="Bold"
+                                       HorizontalAlignment="Right" />
+                            <Border Background="White"
+                                    CornerRadius="8"
+                                    BorderBrush="#FCA5A5"
+                                    BorderThickness="1"
+                                    Padding="2">
+                                <ProgressBar Name="BarEnemyHP" 
+                                             Height="24" 
+                                             Minimum="0" 
+                                             Maximum="100" 
+                                             Value="100" 
+                                             Foreground="#EF4444"
+                                             Background="#F3F4F6"
+                                             CornerRadius="6" />
+                            </Border>
+                        </StackPanel>
+                    </Border>
                 </Grid>
                 
-                <StackPanel Name="PanelCombatActions" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
-                    <Button Name="BtnAttack" Content="⚔️ Attack" Width="120" Height="40" Background="#E0E0E0" Foreground="Black" />
-                    <Button Name="BtnDefend" Content="🛡️ Defend" Width="120" Height="40" Background="#E0E0E0" Foreground="Black" />
+                <!-- Action Buttons -->
+                <StackPanel Name="PanelCombatActions" 
+                            Orientation="Horizontal" 
+                            HorizontalAlignment="Center" 
+                            Spacing="14"
+                            Margin="0,8,0,0">
+                    <Button Name="BtnAttack" 
+                            Width="160" 
+                            Height="52"
+                            Classes="danger">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="⚔️" FontSize="20" VerticalAlignment="Center" />
+                            <TextBlock Text="Attack" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Name="BtnDefend" 
+                            Width="160" 
+                            Height="52"
+                            Classes="primary">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="🛡️" FontSize="20" VerticalAlignment="Center" />
+                            <TextBlock Text="Defend" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </StackPanel>
         </Border>
         
-        <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10" Spacing="5">
-            <TextBlock Name="TxtPlayerStats" Foreground="Black" FontSize="14" />
-        </StackPanel>
+        <!-- Player Stats HUD -->
+        <Border HorizontalAlignment="Left" 
+                VerticalAlignment="Top" 
+                Margin="16"
+                Background="White"
+                CornerRadius="12"
+                Padding="18,14"
+                BorderBrush="#E5E7EB"
+                BorderThickness="2">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="20" 
+                                  Color="#000000" 
+                                  Opacity="0.15"
+                                  OffsetY="4" />
+            </Border.Effect>
+            <StackPanel Spacing="6">
+                <TextBlock Text="🎮 Player Stats"
+                           FontSize="13"
+                           FontWeight="Bold"
+                           Foreground="#6B7280" />
+                <TextBlock Name="TxtPlayerStats" 
+                           Foreground="#111827" 
+                           FontSize="14"
+                           FontWeight="Medium" />
+            </StackPanel>
+        </Border>
+        
+        <!-- Controls Hint -->
+        <Border HorizontalAlignment="Right" 
+                VerticalAlignment="Top" 
+                Margin="16"
+                Background="White"
+                CornerRadius="12"
+                Padding="16,12"
+                BorderBrush="#E5E7EB"
+                BorderThickness="1">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="20" 
+                                  Color="#000000" 
+                                  Opacity="0.15"
+                                  OffsetY="4" />
+            </Border.Effect>
+            <StackPanel Spacing="4">
+                <TextBlock Text="⌨️ Controls"
+                           FontSize="12"
+                           FontWeight="Bold"
+                           Foreground="#6B7280" />
+                <TextBlock Text="WASD / Arrow Keys - Move"
+                           FontSize="11"
+                           Foreground="#9CA3AF" />
+                <TextBlock Text="ESC - Exit Game"
+                           FontSize="11"
+                           Foreground="#9CA3AF" />
+            </StackPanel>
+        </Border>
     </Grid>
     
 </Window>

@@ -2,121 +2,261 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="DotGameAvalonia.Views.MainMenuWindow"
         Title="DotGame – Main Menu"
-    Width="540" Height="600"
+        Width="600" Height="720"
         WindowStartupLocation="CenterScreen"
         CanResize="False"
-        Background="#F5F7FA">
+        Background="#F3F4F6">
 
-    <Grid RowDefinitions="Auto,*">
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- Header Section -->
         <Border Grid.Row="0"
                 Background="White"
                 BorderBrush="#E5E7EB"
-                BorderThickness="0,0,0,1"
-                Padding="32,28">
-            <StackPanel Spacing="6">
-                <TextBlock Text="DotGame Toolkit"
-                           FontSize="28"
-                           FontWeight="Bold"
-                           Foreground="#1F2937" />
-                <TextBlock Text="Jump back into your project or explore a different editor."
-                           FontSize="14"
-                           Foreground="#4B5563" />
+                BorderThickness="0,0,0,2"
+                Padding="36,32">
+            <StackPanel Spacing="8">
+                <TextBlock Text="🎮 DotGame Toolkit"
+                           FontSize="32"
+                           FontWeight="ExtraBold"
+                           Foreground="#111827" />
+                <TextBlock Text="Your all-in-one game development workspace"
+                           FontSize="15"
+                           Foreground="#6B7280"
+                           FontWeight="Medium" />
             </StackPanel>
         </Border>
 
-        <Border Grid.Row="1"
-                Margin="32"
-                Background="White"
-                CornerRadius="14"
-                Padding="24"
-                BorderBrush="#E5E7EB"
-                BorderThickness="1">
+        <!-- Main Content -->
+        <ScrollViewer Grid.Row="1" Padding="36,28">
             <StackPanel Spacing="16">
-                <TextBlock Text="Choose a workspace"
-                           FontSize="16"
+                <TextBlock Text="Choose Your Workspace"
+                           FontSize="17"
                            FontWeight="SemiBold"
-                           Foreground="#111827" />
+                           Foreground="#374151"
+                           Margin="0,0,0,4" />
 
-                <StackPanel Spacing="12">
-                    <Button Name="BtnEditor"
-                            Height="72"
-                            HorizontalContentAlignment="Left"
-                            Padding="18,12"
-                            Background="#EEF2FF"
-                            BorderBrush="#C7D2FE"
-                            BorderThickness="1">
-                        <StackPanel Spacing="4">
+                <!-- Map Editor Card -->
+                <Button Name="BtnEditor"
+                        Height="90"
+                        HorizontalContentAlignment="Stretch"
+                        Padding="24,16">
+                    <Button.Styles>
+                        <Style Selector="Button:pointerover">
+                            <Setter Property="Background" Value="#EEF2FF" />
+                            <Setter Property="BorderBrush" Value="#818CF8" />
+                            <Setter Property="RenderTransform" Value="scale(1.01)" />
+                        </Style>
+                    </Button.Styles>
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Border Grid.Column="0"
+                                Width="56" Height="56"
+                                Background="#EEF2FF"
+                                CornerRadius="12"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,0">
+                            <TextBlock Text="🗺️"
+                                       FontSize="28"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
                             <TextBlock Text="Map Editor"
                                        FontSize="20"
                                        FontWeight="Bold"
-                                       Foreground="#1D4ED8" />
-                            <TextBlock Text="Paint tiles, manage layers, and author interactive maps."
+                                       Foreground="#4338CA" />
+                            <TextBlock Text="Design levels, paint tiles, and create interactive worlds"
                                        FontSize="13"
-                                       Foreground="#374151" />
+                                       Foreground="#6B7280"
+                                       TextWrapping="Wrap" />
                         </StackPanel>
-                    </Button>
+                        <TextBlock Grid.Column="2"
+                                   Text="→"
+                                   FontSize="24"
+                                   Foreground="#9CA3AF"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                </Button>
 
-                    <Button Name="BtnSpriteEditor"
-                            Height="72"
-                            HorizontalContentAlignment="Left"
-                            Padding="18,12">
-                        <StackPanel Spacing="4">
+                <!-- Sprite Editor Card -->
+                <Button Name="BtnSpriteEditor"
+                        Height="90"
+                        HorizontalContentAlignment="Stretch"
+                        Padding="24,16">
+                    <Button.Styles>
+                        <Style Selector="Button:pointerover">
+                            <Setter Property="Background" Value="#FEF3C7" />
+                            <Setter Property="BorderBrush" Value="#FCD34D" />
+                            <Setter Property="RenderTransform" Value="scale(1.01)" />
+                        </Style>
+                    </Button.Styles>
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Border Grid.Column="0"
+                                Width="56" Height="56"
+                                Background="#FEF3C7"
+                                CornerRadius="12"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,0">
+                            <TextBlock Text="🎨"
+                                       FontSize="28"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
                             <TextBlock Text="Sprite Editor"
                                        FontSize="20"
                                        FontWeight="Bold"
-                                       Foreground="#111827" />
-                            <TextBlock Text="Draw pixel art, tweak palettes, and organize frames."
+                                       Foreground="#D97706" />
+                            <TextBlock Text="Draw pixel art, design characters, and manage palettes"
                                        FontSize="13"
-                                       Foreground="#4B5563" />
+                                       Foreground="#6B7280"
+                                       TextWrapping="Wrap" />
                         </StackPanel>
-                    </Button>
+                        <TextBlock Grid.Column="2"
+                                   Text="→"
+                                   FontSize="24"
+                                   Foreground="#9CA3AF"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                </Button>
 
-                    <Button Name="BtnAnimationEditor"
-                            Height="72"
-                            HorizontalContentAlignment="Left"
-                            Padding="18,12">
-                        <StackPanel Spacing="4">
+                <!-- Animation Builder Card -->
+                <Button Name="BtnAnimationEditor"
+                        Height="90"
+                        HorizontalContentAlignment="Stretch"
+                        Padding="24,16">
+                    <Button.Styles>
+                        <Style Selector="Button:pointerover">
+                            <Setter Property="Background" Value="#DBEAFE" />
+                            <Setter Property="BorderBrush" Value="#60A5FA" />
+                            <Setter Property="RenderTransform" Value="scale(1.01)" />
+                        </Style>
+                    </Button.Styles>
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Border Grid.Column="0"
+                                Width="56" Height="56"
+                                Background="#DBEAFE"
+                                CornerRadius="12"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,0">
+                            <TextBlock Text="🎬"
+                                       FontSize="28"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
                             <TextBlock Text="Animation Builder"
                                        FontSize="20"
                                        FontWeight="Bold"
-                                       Foreground="#111827" />
-                            <TextBlock Text="Slice sprite sheets, stage frame order, and preview motion."
+                                       Foreground="#1D4ED8" />
+                            <TextBlock Text="Slice sprite sheets, sequence frames, and preview animations"
                                        FontSize="13"
-                                       Foreground="#4B5563" />
+                                       Foreground="#6B7280"
+                                       TextWrapping="Wrap" />
                         </StackPanel>
-                    </Button>
+                        <TextBlock Grid.Column="2"
+                                   Text="→"
+                                   FontSize="24"
+                                   Foreground="#9CA3AF"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                </Button>
 
-                    <Button Name="BtnTestMap"
-                            Height="72"
-                            HorizontalContentAlignment="Left"
-                            Padding="18,12">
-                        <StackPanel Spacing="4">
+                <!-- Test Map Card -->
+                <Button Name="BtnTestMap"
+                        Height="90"
+                        HorizontalContentAlignment="Stretch"
+                        Padding="24,16">
+                    <Button.Styles>
+                        <Style Selector="Button:pointerover">
+                            <Setter Property="Background" Value="#D1FAE5" />
+                            <Setter Property="BorderBrush" Value="#34D399" />
+                            <Setter Property="RenderTransform" Value="scale(1.01)" />
+                        </Style>
+                    </Button.Styles>
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Border Grid.Column="0"
+                                Width="56" Height="56"
+                                Background="#D1FAE5"
+                                CornerRadius="12"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,0">
+                            <TextBlock Text="🎮"
+                                       FontSize="28"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
                             <TextBlock Text="Test Map"
                                        FontSize="20"
                                        FontWeight="Bold"
-                                       Foreground="#111827" />
-                            <TextBlock Text="Load a map file and playtest it immediately."
+                                       Foreground="#059669" />
+                            <TextBlock Text="Playtest your maps and explore the game world"
                                        FontSize="13"
-                                       Foreground="#4B5563" />
+                                       Foreground="#6B7280"
+                                       TextWrapping="Wrap" />
                         </StackPanel>
-                    </Button>
+                        <TextBlock Grid.Column="2"
+                                   Text="→"
+                                   FontSize="24"
+                                   Foreground="#9CA3AF"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                </Button>
 
-                    <Button Name="BtnCharCreate"
-                            Height="72"
-                            HorizontalContentAlignment="Left"
-                            Padding="18,12">
-                        <StackPanel Spacing="4">
+                <!-- Create Character Card -->
+                <Button Name="BtnCharCreate"
+                        Height="90"
+                        HorizontalContentAlignment="Stretch"
+                        Padding="24,16">
+                    <Button.Styles>
+                        <Style Selector="Button:pointerover">
+                            <Setter Property="Background" Value="#FCE7F3" />
+                            <Setter Property="BorderBrush" Value="#F472B6" />
+                            <Setter Property="RenderTransform" Value="scale(1.01)" />
+                        </Style>
+                    </Button.Styles>
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Border Grid.Column="0"
+                                Width="56" Height="56"
+                                Background="#FCE7F3"
+                                CornerRadius="12"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,0">
+                            <TextBlock Text="⚔️"
+                                       FontSize="28"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
                             <TextBlock Text="Create Character"
                                        FontSize="20"
                                        FontWeight="Bold"
-                                       Foreground="#111827" />
-                            <TextBlock Text="Roll a new hero and save them to your roster."
+                                       Foreground="#DB2777" />
+                            <TextBlock Text="Design heroes, choose classes, and build your party"
                                        FontSize="13"
-                                       Foreground="#4B5563" />
+                                       Foreground="#6B7280"
+                                       TextWrapping="Wrap" />
                         </StackPanel>
-                    </Button>
-                </StackPanel>
+                        <TextBlock Grid.Column="2"
+                                   Text="→"
+                                   FontSize="24"
+                                   Foreground="#9CA3AF"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                </Button>
             </StackPanel>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <Border Grid.Row="2"
+                Background="White"
+                BorderBrush="#E5E7EB"
+                BorderThickness="0,2,0,0"
+                Padding="36,16">
+            <TextBlock Text="Built with Avalonia UI • DotGame Toolkit v1.0"
+                       FontSize="12"
+                       Foreground="#9CA3AF"
+                       HorizontalAlignment="Center" />
         </Border>
     </Grid>
 
