@@ -1,0 +1,168 @@
+<Window xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:mg="clr-namespace:AvaloniaInside.MonoGame;assembly=AvaloniaInside.MonoGame"
+    x:Class="DotGameAvalonia.Views.EditorWindow"
+    Title="DotGame Map Editor"
+    Width="1400" Height="900"
+    WindowStartupLocation="CenterScreen">
+
+    <DockPanel>
+    <Border DockPanel.Dock="Top" Background="White" Padding="6" BorderBrush="#E5E7EB" BorderThickness="0,0,0,1">
+            <StackPanel Name="MainToolBar" Orientation="Horizontal" Spacing="4">
+                <ToggleButton Name="ToolBrush" Content="Brush" IsChecked="True" Margin="2" MinWidth="70" />
+                <ToggleButton Name="ToolEraser" Content="Eraser" Margin="2" MinWidth="70" />
+                <ToggleButton Name="ToolFill" Content="Fill" Margin="2" MinWidth="70" />
+                <ToggleButton Name="ToolRect" Content="Rect" Margin="2" MinWidth="70" />
+                <ToggleButton Name="ToolLine" Content="Line" Margin="2" MinWidth="70" />
+                <ToggleButton Name="ToolPicker" Content="Picker" Margin="2" MinWidth="70" />
+                <ToggleButton Name="ToolSelect" Content="Select" Margin="2" MinWidth="70" />
+                <ToggleButton Name="ToolStamp" Content="Stamp" Margin="2" MinWidth="70" />
+                <ToggleButton Name="ToolCollision" Content="Collision" Margin="2" MinWidth="70" />
+                <Separator />
+                <Button Name="BtnUndo" Content="Undo" Margin="2" MinWidth="60" />
+                <Button Name="BtnRedo" Content="Redo" Margin="2" MinWidth="60" />
+                <Separator />
+                <Button Name="BtnZoomOut" Content="-" Margin="2" Width="32" />
+                <Button Name="BtnZoomReset" Content="100%" Margin="2" Width="60" />
+                <Button Name="BtnZoomIn" Content="+" Margin="2" Width="32" />
+                <Separator />
+                <Button Name="BtnSaveMap" Content="Save" Margin="2" MinWidth="70" />
+                <Button Name="BtnLoadMap" Content="Load" Margin="2" MinWidth="70" />
+                <Button Name="BtnMonoGamePreview" Content="Preview" Margin="2" MinWidth="80" />
+                <Button Name="BtnSpriteEditor" Content="Sprite Editor" Margin="2" MinWidth="100" />
+            </StackPanel>
+        </Border>
+
+    <Border DockPanel.Dock="Bottom" Background="#F3F4F6" Padding="6" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock Name="StatusToolText" Text="Tool: Brush (Tiles)" Margin="8,0" />
+                <TextBlock Name="StatusCoordText" Text="Cursor: --" Margin="8,0" />
+                <TextBlock Name="StatusTileText" Text="Tile: --" Margin="8,0" />
+                <TextBlock Name="StatusZoomText" Text="Zoom: 100%" Margin="8,0" />
+            </StackPanel>
+        </Border>
+
+    <Border DockPanel.Dock="Left" Width="280" Background="White" BorderBrush="#E5E7EB" BorderThickness="0,0,1,0">
+            <TabControl Name="AssetTabs">
+                <TabItem Header="Tiles">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="12" Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Button Name="BtnLoadSpriteSheet" Content="Load Sheet" Width="110" />
+                                <Button Name="BtnSplitSheet" Content="Split" Width="80" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Button Name="BtnLoadTiles" Content="Import Tiles" Width="110" />
+                                <Button Name="BtnClearGrid" Content="Clear Map" Width="100" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="Tile W" VerticalAlignment="Center" />
+                                <NumericUpDown Name="NumTileWidth" Minimum="1" Maximum="512" Value="32" Width="70" />
+                                <TextBlock Text="Tile H" VerticalAlignment="Center" />
+                                <NumericUpDown Name="NumTileHeight" Minimum="1" Maximum="512" Value="32" Width="70" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="Spacing" VerticalAlignment="Center" />
+                                <NumericUpDown Name="NumSpacing" Minimum="0" Maximum="64" Value="0" Width="70" />
+                                <TextBlock Text="Margin" VerticalAlignment="Center" />
+                                <NumericUpDown Name="NumMargin" Minimum="0" Maximum="64" Value="0" Width="70" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="Brush" VerticalAlignment="Center" />
+                                <NumericUpDown Name="NumBrushSize" Minimum="1" Maximum="10" Value="1" Width="70" />
+                                <TextBlock Text="Grid" VerticalAlignment="Center" />
+                                <ComboBox Name="CmbGridSize" Width="90" SelectedIndex="1">
+                                    <ComboBoxItem>10</ComboBoxItem>
+                                    <ComboBoxItem>20</ComboBoxItem>
+                                    <ComboBoxItem>30</ComboBoxItem>
+                                    <ComboBoxItem>40</ComboBoxItem>
+                                    <ComboBoxItem>50</ComboBoxItem>
+                                </ComboBox>
+                            </StackPanel>
+                            <Border BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="4" Padding="6" Background="#F9FAFB">
+                                <ScrollViewer Height="360" VerticalScrollBarVisibility="Auto">
+                                    <WrapPanel Name="TilePalette" Orientation="Horizontal" />
+                                </ScrollViewer>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+                <TabItem Header="Characters">
+                    <StackPanel Margin="12" Spacing="8">
+                        <Button Name="BtnAddCharacter" Content="Add Character" />
+                        <Button Name="BtnEditCharacter" Content="Edit Selected" />
+                        <ListBox Name="CharacterList" Height="320" />
+                    </StackPanel>
+                </TabItem>
+                <TabItem Header="Doodads">
+                    <StackPanel Margin="12" Spacing="8">
+                        <Button Name="BtnAddDoodad" Content="Add Doodad" />
+                        <Button Name="BtnEditDoodad" Content="Edit Selected" />
+                        <ListBox Name="DoodadList" Height="320" />
+                    </StackPanel>
+                </TabItem>
+                <TabItem Header="Triggers">
+                    <StackPanel Margin="12" Spacing="8">
+                        <Button Name="BtnAddTrigger" Content="New Trigger" />
+                        <Button Name="BtnRemoveTrigger" Content="Remove Selected" />
+                        <ListBox Name="TriggerList" Height="320" />
+                    </StackPanel>
+                </TabItem>
+            </TabControl>
+        </Border>
+
+    <Border DockPanel.Dock="Right" Width="280" Background="White" BorderBrush="#E5E7EB" BorderThickness="1,0,0,0">
+            <TabControl Name="InspectorTabs">
+                <TabItem Header="Layers">
+                    <StackPanel Margin="12" Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Button Name="BtnAddLayer" Content="Add" Width="60" />
+                            <Button Name="BtnRemoveLayer" Content="Remove" Width="80" />
+                            <Button Name="BtnLayerUp" Content="Up" Width="50" />
+                            <Button Name="BtnLayerDown" Content="Down" Width="60" />
+                        </StackPanel>
+                        <ListBox Name="LayerList" Height="240" />
+                        <CheckBox Name="GridVisibilityCheck" Content="Show Grid" IsChecked="True" />
+                    </StackPanel>
+                </TabItem>
+                <TabItem Header="Properties">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Name="PropertiesPanel" Margin="12" Spacing="6" />
+                    </ScrollViewer>
+                </TabItem>
+                <TabItem Header="History">
+                    <ListBox Name="HistoryList" Margin="12" Height="360" />
+                </TabItem>
+            </TabControl>
+        </Border>
+
+        <Grid Background="#F8FAFC">
+            <Border Margin="8" Background="White" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="6" Padding="4">
+                <TabControl Name="ViewportTabControl">
+                    <TabItem Header="Editor">
+                        <ScrollViewer Name="ViewportScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                            <Canvas Name="MapCanvas"
+                                    Background="White"
+                                    MinWidth="512"
+                                    MinHeight="512"
+                                    PointerPressed="MapCanvas_PointerPressed"
+                                    PointerMoved="MapCanvas_PointerMoved"
+                                    PointerReleased="MapCanvas_PointerReleased"
+                                    PointerWheelChanged="MapCanvas_PointerWheelChanged"
+                                    PointerExited="MapCanvas_PointerLeave" />
+                        </ScrollViewer>
+                    </TabItem>
+                    <TabItem Header="Preview">
+                        <Grid Background="#F8FAFC">
+                            <mg:MonoGameControl x:Name="RuntimePreviewHost"
+                                                FallbackBackground="#F8FAFC"
+                                                HorizontalAlignment="Stretch"
+                                                VerticalAlignment="Stretch" />
+                        </Grid>
+                    </TabItem>
+                </TabControl>
+            </Border>
+        </Grid>
+    </DockPanel>
+
+</Window>

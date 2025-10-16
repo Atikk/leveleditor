@@ -1,10 +1,14 @@
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotGameAvalonia", "DotGame\DotGameAvalonia.csproj", "{DE546E68-47CD-F19E-9122-3A825C8315A7}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotGame.Runtime", "DotGame.Runtime\DotGame.Runtime.csproj", "{A511000A-47BA-4AFF-913B-1F468094751A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotGame.Core", "DotGame.Core\DotGame.Core.csproj", "{8E76325E-212B-4AF2-ABE5-9F0811F899F8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -16,6 +20,14 @@ Global
 		{DE546E68-47CD-F19E-9122-3A825C8315A7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DE546E68-47CD-F19E-9122-3A825C8315A7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DE546E68-47CD-F19E-9122-3A825C8315A7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A511000A-47BA-4AFF-913B-1F468094751A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A511000A-47BA-4AFF-913B-1F468094751A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A511000A-47BA-4AFF-913B-1F468094751A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A511000A-47BA-4AFF-913B-1F468094751A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8E76325E-212B-4AF2-ABE5-9F0811F899F8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8E76325E-212B-4AF2-ABE5-9F0811F899F8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8E76325E-212B-4AF2-ABE5-9F0811F899F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8E76325E-212B-4AF2-ABE5-9F0811F899F8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

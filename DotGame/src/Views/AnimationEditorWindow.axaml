@@ -1,0 +1,68 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="DotGameAvalonia.Views.AnimationEditorWindow"
+        Title="Animation Builder"
+        Width="1100" Height="750"
+        WindowStartupLocation="CenterScreen"
+        Background="#F5F7FA">
+    <DockPanel>
+        <Border DockPanel.Dock="Top"
+                Background="White"
+                BorderBrush="#E5E7EB"
+                BorderThickness="0,0,0,1"
+                Padding="16">
+            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <Button Name="BtnLoadSheet" Content="Load Sprite Sheet" Width="160" />
+                <TextBlock Text="Frame W:" VerticalAlignment="Center" />
+                <NumericUpDown Name="NumFrameWidth" Minimum="1" Maximum="1024" Value="64" Width="90" />
+                <TextBlock Text="Frame H:" VerticalAlignment="Center" />
+                <NumericUpDown Name="NumFrameHeight" Minimum="1" Maximum="1024" Value="64" Width="90" />
+                <TextBlock Text="Duration (ms):" VerticalAlignment="Center" />
+                <NumericUpDown Name="NumFrameDuration" Minimum="16" Maximum="1000" Value="120" Width="100" />
+                <CheckBox Name="ChkLoop" Content="Loop" IsChecked="True" VerticalAlignment="Center" />
+                <Button Name="BtnPlay" Content="Play" Width="90" />
+                <Button Name="BtnStop" Content="Stop" Width="90" />
+                <Button Name="BtnSave" Content="Save Animation" Width="160" />
+            </StackPanel>
+        </Border>
+
+        <Grid Margin="18">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width="2*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    BorderBrush="#D1D5DB"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Background="White"
+                    Padding="6">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="White">
+                    <WrapPanel Name="FrameWrapPanel" Margin="6" />
+                </ScrollViewer>
+            </Border>
+
+            <Border Grid.Column="1"
+                    BorderBrush="#D1D5DB"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="16"
+                    Margin="18,0,0,0"
+                    Background="White">
+                <StackPanel Spacing="14">
+                    <TextBlock Name="SpriteInfoText" Text="Load a sprite sheet to begin." TextWrapping="Wrap" Foreground="#1F2937" />
+                    <Border BorderBrush="#CBD5F5" BorderThickness="1" CornerRadius="8" Background="#F8FAFF" Height="260" HorizontalAlignment="Stretch">
+                        <Image Name="PreviewImage" Stretch="Uniform" />
+                    </Border>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Name="BtnClearSelection" Content="Clear Selection" Width="160" />
+                        <Button Name="BtnRemoveSelected" Content="Remove Frame" Width="160" />
+                    </StackPanel>
+                    <TextBlock Text="Selected Frames" FontWeight="Bold" Foreground="#111827" />
+                    <ListBox Name="SelectedFramesList" Height="220" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

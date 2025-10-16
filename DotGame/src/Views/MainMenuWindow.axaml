@@ -1,0 +1,123 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="DotGameAvalonia.Views.MainMenuWindow"
+        Title="DotGame – Main Menu"
+    Width="540" Height="600"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        Background="#F5F7FA">
+
+    <Grid RowDefinitions="Auto,*">
+        <Border Grid.Row="0"
+                Background="White"
+                BorderBrush="#E5E7EB"
+                BorderThickness="0,0,0,1"
+                Padding="32,28">
+            <StackPanel Spacing="6">
+                <TextBlock Text="DotGame Toolkit"
+                           FontSize="28"
+                           FontWeight="Bold"
+                           Foreground="#1F2937" />
+                <TextBlock Text="Jump back into your project or explore a different editor."
+                           FontSize="14"
+                           Foreground="#4B5563" />
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1"
+                Margin="32"
+                Background="White"
+                CornerRadius="14"
+                Padding="24"
+                BorderBrush="#E5E7EB"
+                BorderThickness="1">
+            <StackPanel Spacing="16">
+                <TextBlock Text="Choose a workspace"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Foreground="#111827" />
+
+                <StackPanel Spacing="12">
+                    <Button Name="BtnEditor"
+                            Height="72"
+                            HorizontalContentAlignment="Left"
+                            Padding="18,12"
+                            Background="#EEF2FF"
+                            BorderBrush="#C7D2FE"
+                            BorderThickness="1">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Map Editor"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="#1D4ED8" />
+                            <TextBlock Text="Paint tiles, manage layers, and author interactive maps."
+                                       FontSize="13"
+                                       Foreground="#374151" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Name="BtnSpriteEditor"
+                            Height="72"
+                            HorizontalContentAlignment="Left"
+                            Padding="18,12">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Sprite Editor"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="#111827" />
+                            <TextBlock Text="Draw pixel art, tweak palettes, and organize frames."
+                                       FontSize="13"
+                                       Foreground="#4B5563" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Name="BtnAnimationEditor"
+                            Height="72"
+                            HorizontalContentAlignment="Left"
+                            Padding="18,12">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Animation Builder"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="#111827" />
+                            <TextBlock Text="Slice sprite sheets, stage frame order, and preview motion."
+                                       FontSize="13"
+                                       Foreground="#4B5563" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Name="BtnTestMap"
+                            Height="72"
+                            HorizontalContentAlignment="Left"
+                            Padding="18,12">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Test Map"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="#111827" />
+                            <TextBlock Text="Load a map file and playtest it immediately."
+                                       FontSize="13"
+                                       Foreground="#4B5563" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Name="BtnCharCreate"
+                            Height="72"
+                            HorizontalContentAlignment="Left"
+                            Padding="18,12">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Create Character"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="#111827" />
+                            <TextBlock Text="Roll a new hero and save them to your roster."
+                                       FontSize="13"
+                                       Foreground="#4B5563" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+
+</Window>

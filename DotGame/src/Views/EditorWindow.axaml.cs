@@ -1,18 +1,24 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
 using DotGameAvalonia.Models;
+using AvaloniaInside.MonoGame;
+using DotGame.Runtime;
 using DotGameAvalonia.MonoGameLayer;
 using SkiaSharp;
 using IOPath = System.IO.Path;
@@ -71,22 +77,152 @@ namespace DotGameAvalonia.Views
             }
         }
 
+        private sealed class LayerState : INotifyPropertyChanged
+        {
+            private string name;
+            private bool isVisible = true;
+            private double opacity = 1.0;
+
+            public LayerState(string id, string name, TileEntry?[,] tiles)
+            {
+                Id = id;
+                this.name = name;
+                Tiles = tiles;
+            }
+
+            public string Id { get; }
+
+            public string Name
+            {
+                get => name;
+                set
+                {
+                    if (name != value)
+                    {
+                        name = value;
+                        OnPropertyChanged(nameof(Name));
+                    }
+                }
+            }
+
+            public bool IsVisible
+            {
+                get => isVisible;
+                set
+                {
+                    if (isVisible != value)
+                    {
+                        isVisible = value;
+                        OnPropertyChanged(nameof(IsVisible));
+                    }
+                }
+            }
+
+            public double Opacity
+            {
+                get => opacity;
+                set
+                {
+                    var clamped = Math.Clamp(value, 0.0, 1.0);
+                    if (Math.Abs(opacity - clamped) > double.Epsilon)
+                    {
+                        opacity = clamped;
+                        OnPropertyChanged(nameof(Opacity));
+                    }
+                }
+            }
+
+            public TileEntry?[,] Tiles { get; set; }
+
+            public event PropertyChangedEventHandler? PropertyChanged;
+
+            private void OnPropertyChanged(string propertyName)
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            }
+
+            public override string ToString() => Name;
+        }
+
+        private sealed class MapLayerDto
+        {
+            public string? Id { get; set; }
+            public string? Name { get; set; }
+            public bool IsVisible { get; set; } = true;
+            public double Opacity { get; set; } = 1.0;
+            public string?[][]? Tiles { get; set; }
+        }
+
+        private sealed class MapFileDto
+        {
+            public int Cols { get; set; }
+            public int Rows { get; set; }
+            public int TileW { get; set; }
+            public int TileH { get; set; }
+            public List<MapLayerDto>? Layers { get; set; }
+            public int? ActiveLayerIndex { get; set; }
+        }
+
         private readonly List<TileEntry> tiles = new();
-        private TileEntry? selectedTile = null;
-        private Bitmap? spriteSheetImage = null;
+        private TileEntry? selectedTile;
+        private Bitmap? spriteSheetImage;
         private int gridSize = 20;
         private int brushSize = 1;
-        private TileEntry?[,] mapData;
-        private bool isMouseDown = false;
-        private Border? selectedTileBorder = null;
-    private Thread? previewThread;
-    private EditorGame? previewGame;
-    private readonly object previewGameLock = new();
+        private readonly ObservableCollection<LayerState> layers = new();
+        private readonly ObservableCollection<string> historyEntries = new();
+        private int activeLayerIndex;
+        private bool isMouseDown;
+        private Border? selectedTileBorder;
+        private Thread? previewThread;
+        private EditorGame? previewGame;
+        private readonly object previewGameLock = new();
 
         private Canvas? mapCanvas;
         private WrapPanel? tilePalette;
-        private NumericUpDown? numTileWidth, numTileHeight, numSpacing, numMargin, numBrushSize;
+        private NumericUpDown? numTileWidth;
+        private NumericUpDown? numTileHeight;
+        private NumericUpDown? numSpacing;
+        private NumericUpDown? numMargin;
+        private NumericUpDown? numBrushSize;
         private ComboBox? cmbGridSize;
+        private ToggleButton? toolBrush;
+        private ToggleButton? toolEraser;
+        private ToggleButton? toolFill;
+        private ToggleButton? toolRect;
+        private ToggleButton? toolLine;
+        private ToggleButton? toolPicker;
+        private ToggleButton? toolSelect;
+        private ToggleButton? toolStamp;
+        private ToggleButton? toolCollision;
+        private Button? btnUndo;
+        private Button? btnRedo;
+        private Button? btnZoomOut;
+        private Button? btnZoomReset;
+        private Button? btnZoomIn;
+        private Button? btnAddLayer;
+        private Button? btnRemoveLayer;
+        private Button? btnLayerUp;
+        private Button? btnLayerDown;
+        private TextBlock? statusToolText;
+        private TextBlock? statusCoordText;
+        private TextBlock? statusTileText;
+        private TextBlock? statusZoomText;
+        private StackPanel? propertiesPanel;
+        private ListBox? historyList;
+        private ListBox? layerList;
+        private CheckBox? gridVisibilityCheck;
+    private ScrollViewer? viewportScroll;
+    private TabControl? viewportTabControl;
+    private MonoGameControl? runtimePreviewHost;
+    private Game1? runtimePreviewGame;
+        private double zoomLevel = 1.0;
+        private bool suppressToolToggle;
+        private bool suppressLayerSelection;
+        private float currentCellSize = 32f;
+
+        private const double MinZoom = 0.25;
+        private const double MaxZoom = 4.0;
+        private const int MaxHistoryEntries = 200;
 
         private enum EditorMode
         {
@@ -95,14 +231,28 @@ namespace DotGameAvalonia.Views
             Doodads
         }
 
+        private enum EditorTool
+        {
+            Brush,
+            Eraser,
+            Fill,
+            Rect,
+            Line,
+            Picker,
+            Select,
+            Stamp,
+            Collision
+        }
+
         private EditorMode currentMode = EditorMode.Tiles;
-    private List<Character> characters = new();
-    private List<Doodad> doodads = new();
-    private Character? pendingCharacterTemplate;
-    private Doodad? pendingDoodadTemplate;
-    private Character? selectedCharacter;
-    private Doodad? selectedDoodad;
-    private bool suppressGridSizeEvent;
+        private EditorTool currentTool = EditorTool.Brush;
+        private readonly List<Character> characters = new();
+        private readonly List<Doodad> doodads = new();
+        private Character? pendingCharacterTemplate;
+        private Doodad? pendingDoodadTemplate;
+        private Character? selectedCharacter;
+        private Doodad? selectedDoodad;
+        private bool suppressGridSizeEvent;
 
         private StackPanel? TilesToolsPanel => this.FindControl<StackPanel>("TilesTools");
         private StackPanel? CharactersToolsPanel => this.FindControl<StackPanel>("CharactersTools");
@@ -110,14 +260,285 @@ namespace DotGameAvalonia.Views
 
         private Map map;
 
+        private LayerState ActiveLayer
+        {
+            get
+            {
+                if (layers.Count == 0)
+                {
+                    layers.Add(CreateLayer("Base Layer"));
+                    activeLayerIndex = 0;
+                }
+
+                activeLayerIndex = Math.Clamp(activeLayerIndex, 0, layers.Count - 1);
+                return layers[activeLayerIndex];
+            }
+        }
+
+        private IEnumerable<LayerState> VisibleLayers => layers.Where(layer => layer.IsVisible);
+
+        private TileEntry?[,] ActiveTiles => ActiveLayer.Tiles;
+
+        private bool InBounds(int x, int y)
+        {
+            if (layers.Count == 0)
+                return false;
+
+            var tiles = ActiveLayer.Tiles;
+            return x >= 0 && y >= 0 && x < tiles.GetLength(0) && y < tiles.GetLength(1);
+        }
+
+        private void InitializeLayerSystem()
+        {
+            layers.Clear();
+            layers.Add(CreateLayer("Base Layer"));
+            activeLayerIndex = 0;
+        }
+
+        private LayerState CreateLayer(string name, TileEntry?[,]? tiles = null, string? id = null, bool isVisible = true, double opacity = 1.0)
+        {
+            var buffer = tiles ?? CreateTileBuffer(gridSize);
+            var layer = new LayerState(id ?? Guid.NewGuid().ToString("N"), name, buffer)
+            {
+                IsVisible = isVisible
+            };
+            layer.Opacity = opacity;
+            return layer;
+        }
+
+        private TileEntry?[,] CreateTileBuffer(int width, int height)
+        {
+            width = Math.Max(1, width);
+            height = Math.Max(1, height);
+            return new TileEntry?[width, height];
+        }
+
+        private TileEntry?[,] CreateTileBuffer(int size) => CreateTileBuffer(size, size);
+
+        private void SetActiveLayer(int index, bool scrollIntoView = true)
+        {
+            if (layers.Count == 0)
+                return;
+
+            activeLayerIndex = Math.Clamp(index, 0, layers.Count - 1);
+            UpdateLayerSelectionUI(scrollIntoView);
+            UpdateStatusTool();
+        }
+
+        private void UpdateLayerSelectionUI(bool scrollIntoView)
+        {
+            if (layerList == null)
+                return;
+
+            suppressLayerSelection = true;
+            layerList.SelectedIndex = Math.Clamp(activeLayerIndex, 0, layers.Count - 1);
+            if (scrollIntoView && layerList.SelectedItem != null)
+            {
+                layerList.ScrollIntoView(layerList.SelectedItem);
+            }
+            suppressLayerSelection = false;
+        }
+
+        private void ResizeAllLayers(int newSize)
+        {
+            if (newSize <= 0)
+                newSize = 1;
+
+            foreach (var layer in layers)
+            {
+                var current = layer.Tiles;
+                if (current.GetLength(0) == newSize && current.GetLength(1) == newSize)
+                    continue;
+
+                var resized = new TileEntry?[newSize, newSize];
+                int maxX = Math.Min(newSize, current.GetLength(0));
+                int maxY = Math.Min(newSize, current.GetLength(1));
+                for (int x = 0; x < maxX; x++)
+                {
+                    for (int y = 0; y < maxY; y++)
+                        resized[x, y] = current[x, y];
+                }
+
+                layer.Tiles = resized;
+            }
+        }
+
+        private void ClearLayerTiles(LayerState layer)
+        {
+            var tiles = layer.Tiles;
+            layer.Tiles = CreateTileBuffer(tiles.GetLength(0), tiles.GetLength(1));
+        }
+
+        private void PushHistory(string message)
+        {
+            var timestamp = DateTime.Now.ToString("HH:mm:ss");
+            historyEntries.Insert(0, $"[{timestamp}] {message}");
+
+            while (historyEntries.Count > MaxHistoryEntries)
+                historyEntries.RemoveAt(historyEntries.Count - 1);
+        }
+
+        private TileEntry? GetTopmostTile(int x, int y, out LayerState? owningLayer)
+        {
+            owningLayer = null;
+
+            for (int i = layers.Count - 1; i >= 0; i--)
+            {
+                var layer = layers[i];
+                if (!layer.IsVisible)
+                    continue;
+
+                var tiles = layer.Tiles;
+                if (x < 0 || y < 0 || x >= tiles.GetLength(0) || y >= tiles.GetLength(1))
+                    continue;
+
+                var entry = tiles[x, y];
+                if (entry != null)
+                {
+                    owningLayer = layer;
+                    return entry;
+                }
+            }
+
+            return null;
+        }
+
+        private TileEntry? GetTopmostTile(int x, int y) => GetTopmostTile(x, y, out _);
+
+        private string? GetSerializedTileAt(int x, int y)
+        {
+            return GetTopmostTile(x, y)?.GetSerializedValue();
+        }
+
+        private TileEntry? LoadTileEntry(string storedValue, string baseDirectory)
+        {
+            if (string.IsNullOrWhiteSpace(storedValue))
+                return null;
+
+            if (storedValue.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                return TileEntry.FromDataUrl(storedValue);
+
+            var resolved = IOPath.IsPathRooted(storedValue)
+                ? storedValue
+                : IOPath.Combine(baseDirectory, storedValue);
+
+            if (!System.IO.File.Exists(resolved))
+            {
+                Console.WriteLine($"Warning: Tile asset not found at {resolved}.");
+                return null;
+            }
+
+            try
+            {
+                return new TileEntry(new Bitmap(resolved), resolved, null, storedValue);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to load tile asset '{resolved}': {ex.Message}");
+                return null;
+            }
+        }
+
+        private TileEntry?[,] CreateTileBufferFromSerialized(string?[][]? source, string baseDirectory, int fallbackCols, int fallbackRows)
+        {
+            int height = Math.Max(1, source?.Length ?? fallbackRows);
+            int width = fallbackCols;
+
+            if (source != null && source.Length > 0)
+            {
+                width = source.Max(row => row?.Length ?? 0);
+            }
+
+            width = Math.Max(1, width);
+
+            var buffer = new TileEntry?[width, height];
+
+            if (source != null)
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    var row = y < source.Length ? source[y] : null;
+                    for (int x = 0; x < width; x++)
+                    {
+                        string? stored = row != null && x < row.Length ? row[x] : null;
+                        buffer[x, y] = string.IsNullOrWhiteSpace(stored) ? null : LoadTileEntry(stored!, baseDirectory);
+                    }
+                }
+            }
+
+            return buffer;
+        }
+
+        private void AddLayerAfterActive()
+        {
+            var newLayer = CreateLayer($"Layer {layers.Count + 1}");
+            var insertIndex = layers.Count == 0 ? 0 : Math.Clamp(activeLayerIndex + 1, 0, layers.Count);
+            layers.Insert(insertIndex, newLayer);
+            SetActiveLayer(insertIndex);
+            PushHistory($"Added layer '{newLayer.Name}'");
+            RenderMap();
+            SyncMapFromEditorState();
+        }
+
+        private void RemoveActiveLayer()
+        {
+            if (layers.Count <= 1)
+            {
+                Console.WriteLine("Cannot remove the final layer.");
+                return;
+            }
+
+            var removed = ActiveLayer;
+            var oldIndex = activeLayerIndex;
+            layers.RemoveAt(oldIndex);
+            SetActiveLayer(Math.Clamp(oldIndex - 1, 0, layers.Count - 1));
+            PushHistory($"Removed layer '{removed.Name}'");
+            RenderMap();
+            SyncMapFromEditorState();
+        }
+
+        private void MoveActiveLayer(int delta)
+        {
+            if (layers.Count <= 1 || delta == 0)
+                return;
+
+            var newIndex = activeLayerIndex + delta;
+            if (newIndex < 0 || newIndex >= layers.Count)
+                return;
+
+            var layerName = ActiveLayer.Name;
+            layers.Move(activeLayerIndex, newIndex);
+            SetActiveLayer(newIndex);
+            PushHistory(delta > 0
+                ? $"Moved layer '{layerName}' up"
+                : $"Moved layer '{layerName}' down");
+            RenderMap();
+            SyncMapFromEditorState();
+        }
+
+        private void ClearActiveLayer()
+        {
+            ClearLayerTiles(ActiveLayer);
+            PushHistory($"Cleared layer '{ActiveLayer.Name}'");
+            RenderMap();
+            SyncMapFromEditorState();
+        }
+
+
         public EditorWindow()
         {
             InitializeComponent();
-            map = new Map(); // Initialize the map field
-            mapData = new TileEntry?[gridSize, gridSize];
+            map = new Map();
+            InitializeLayerSystem();
             AttachEvents();
+            InitializeRuntimePreview();
             InitializeEditorUI();
             SyncMapFromEditorState();
+        }
+
+        private void InitializeComponent()
+        {
+            AvaloniaXamlLoader.Load(this);
         }
 
         private void AttachEvents()
@@ -130,6 +551,46 @@ namespace DotGameAvalonia.Views
             numMargin = this.FindControl<NumericUpDown>("NumMargin");
             numBrushSize = this.FindControl<NumericUpDown>("NumBrushSize");
             cmbGridSize = this.FindControl<ComboBox>("CmbGridSize");
+            toolBrush = this.FindControl<ToggleButton>("ToolBrush");
+            toolEraser = this.FindControl<ToggleButton>("ToolEraser");
+            toolFill = this.FindControl<ToggleButton>("ToolFill");
+            toolRect = this.FindControl<ToggleButton>("ToolRect");
+            toolLine = this.FindControl<ToggleButton>("ToolLine");
+            toolPicker = this.FindControl<ToggleButton>("ToolPicker");
+            toolSelect = this.FindControl<ToggleButton>("ToolSelect");
+            toolStamp = this.FindControl<ToggleButton>("ToolStamp");
+            toolCollision = this.FindControl<ToggleButton>("ToolCollision");
+            btnUndo = this.FindControl<Button>("BtnUndo");
+            btnRedo = this.FindControl<Button>("BtnRedo");
+            btnZoomOut = this.FindControl<Button>("BtnZoomOut");
+            btnZoomReset = this.FindControl<Button>("BtnZoomReset");
+            btnZoomIn = this.FindControl<Button>("BtnZoomIn");
+            btnAddLayer = this.FindControl<Button>("BtnAddLayer");
+            btnRemoveLayer = this.FindControl<Button>("BtnRemoveLayer");
+            btnLayerUp = this.FindControl<Button>("BtnLayerUp");
+            btnLayerDown = this.FindControl<Button>("BtnLayerDown");
+            statusToolText = this.FindControl<TextBlock>("StatusToolText");
+            statusCoordText = this.FindControl<TextBlock>("StatusCoordText");
+            statusTileText = this.FindControl<TextBlock>("StatusTileText");
+            statusZoomText = this.FindControl<TextBlock>("StatusZoomText");
+            propertiesPanel = this.FindControl<StackPanel>("PropertiesPanel");
+            historyList = this.FindControl<ListBox>("HistoryList");
+            layerList = this.FindControl<ListBox>("LayerList");
+            gridVisibilityCheck = this.FindControl<CheckBox>("GridVisibilityCheck");
+            viewportScroll = this.FindControl<ScrollViewer>("ViewportScroll");
+            viewportTabControl = this.FindControl<TabControl>("ViewportTabControl");
+            runtimePreviewHost = this.FindControl<MonoGameControl>("RuntimePreviewHost");
+
+            HookToolToggle(toolBrush, EditorTool.Brush);
+            HookToolToggle(toolEraser, EditorTool.Eraser);
+            HookToolToggle(toolFill, EditorTool.Fill);
+            HookToolToggle(toolRect, EditorTool.Rect);
+            HookToolToggle(toolLine, EditorTool.Line);
+            HookToolToggle(toolPicker, EditorTool.Picker);
+            HookToolToggle(toolSelect, EditorTool.Select);
+            HookToolToggle(toolStamp, EditorTool.Stamp);
+            HookToolToggle(toolCollision, EditorTool.Collision);
+
 
             var btnLoadSpriteSheet = this.FindControl<Button>("BtnLoadSpriteSheet");
             var btnSplitSheet = this.FindControl<Button>("BtnSplitSheet");
@@ -174,16 +635,238 @@ namespace DotGameAvalonia.Views
                 btnAddDoodad.Click += BtnAddDoodad_Click;
             if (btnEditDoodad != null)
                 btnEditDoodad.Click += BtnEditDoodad_Click;
+            if (btnAddLayer != null)
+                btnAddLayer.Click += (_, _) => AddLayerAfterActive();
+            if (btnRemoveLayer != null)
+                btnRemoveLayer.Click += (_, _) => RemoveActiveLayer();
+            if (btnLayerUp != null)
+                btnLayerUp.Click += (_, _) => MoveActiveLayer(1);
+            if (btnLayerDown != null)
+                btnLayerDown.Click += (_, _) => MoveActiveLayer(-1);
             
             if (cmbGridSize != null)
                 cmbGridSize.SelectionChanged += CmbGridSize_SelectionChanged;
-            
+
             if (numBrushSize != null)
-                numBrushSize.ValueChanged += (s, e) => brushSize = (int)(numBrushSize.Value ?? 1);
+                numBrushSize.ValueChanged += (_, _) => brushSize = (int)(numBrushSize.Value ?? 1);
+
+            if (btnZoomOut != null)
+                btnZoomOut.Click += (_, _) => AdjustZoom(0.9);
+            if (btnZoomIn != null)
+                btnZoomIn.Click += (_, _) => AdjustZoom(1.1);
+            if (btnZoomReset != null)
+                btnZoomReset.Click += (_, _) => ResetZoom();
+
+            if (gridVisibilityCheck != null)
+                gridVisibilityCheck.IsCheckedChanged += (_, _) => RenderMap();
+
+            if (layerList != null)
+            {
+                layerList.ItemsSource = layers;
+                layerList.SelectionChanged += LayerList_SelectionChanged;
+                layerList.SelectedIndex = activeLayerIndex;
+                UpdateLayerSelectionUI(scrollIntoView: false);
+            }
+
+            if (historyList != null)
+                historyList.ItemsSource = historyEntries;
+
+            ApplyZoom();
+            SelectPrimaryTool(EditorTool.Brush);
+            UpdateStatusTool();
+            UpdateStatusZoom();
+            UpdateStatusCursor(null);
+            UpdateStatusTileInfo(-1, -1);
 
             SyncMapFromEditorState();
             RenderMap();
             SyncMapFromEditorState();
+        }
+
+        private void InitializeRuntimePreview()
+        {
+            if (runtimePreviewHost == null)
+                return;
+
+            if (runtimePreviewGame != null)
+                return;
+
+            runtimePreviewGame = new Game1();
+            runtimePreviewHost.Game = runtimePreviewGame;
+        }
+
+        private void HookToolToggle(ToggleButton? button, EditorTool tool)
+        {
+            if (button == null)
+                return;
+
+            button.IsCheckedChanged += (_, _) =>
+            {
+                if (button.IsChecked == true && !suppressToolToggle)
+                {
+                    SelectPrimaryTool(tool);
+                }
+                else if (button.IsChecked != true && !suppressToolToggle && currentTool == tool)
+                {
+                    suppressToolToggle = true;
+                    button.IsChecked = true;
+                    suppressToolToggle = false;
+                }
+            };
+        }
+
+        private void SelectPrimaryTool(EditorTool tool)
+        {
+            if (currentTool == tool && suppressToolToggle)
+                return;
+
+            currentTool = tool;
+            suppressToolToggle = true;
+            toolBrush?.SetValue(ToggleButton.IsCheckedProperty, tool == EditorTool.Brush);
+            toolEraser?.SetValue(ToggleButton.IsCheckedProperty, tool == EditorTool.Eraser);
+            toolFill?.SetValue(ToggleButton.IsCheckedProperty, tool == EditorTool.Fill);
+            toolRect?.SetValue(ToggleButton.IsCheckedProperty, tool == EditorTool.Rect);
+            toolLine?.SetValue(ToggleButton.IsCheckedProperty, tool == EditorTool.Line);
+            toolPicker?.SetValue(ToggleButton.IsCheckedProperty, tool == EditorTool.Picker);
+            toolSelect?.SetValue(ToggleButton.IsCheckedProperty, tool == EditorTool.Select);
+            toolStamp?.SetValue(ToggleButton.IsCheckedProperty, tool == EditorTool.Stamp);
+            toolCollision?.SetValue(ToggleButton.IsCheckedProperty, tool == EditorTool.Collision);
+            suppressToolToggle = false;
+            UpdateStatusTool();
+        }
+
+        private void UpdateStatusTool()
+        {
+            if (statusToolText == null)
+                return;
+
+            string modeName = currentMode switch
+            {
+                EditorMode.Characters => "Characters",
+                EditorMode.Doodads => "Doodads",
+                _ => "Tiles"
+            };
+
+            string toolName = currentTool switch
+            {
+                EditorTool.Brush => "Brush",
+                EditorTool.Eraser => "Eraser",
+                EditorTool.Fill => "Fill",
+                EditorTool.Rect => "Rect",
+                EditorTool.Line => "Line",
+                EditorTool.Picker => "Picker",
+                EditorTool.Select => "Select",
+                EditorTool.Stamp => "Stamp",
+                EditorTool.Collision => "Collision",
+                _ => "Unknown"
+            };
+
+            statusToolText.Text = $"Tool: {toolName} ({modeName})";
+        }
+
+        private void UpdateStatusZoom()
+        {
+            if (statusZoomText == null)
+                return;
+
+            statusZoomText.Text = $"Zoom: {Math.Round(zoomLevel * 100)}%";
+        }
+
+        private void UpdateStatusCursor(Point? mapPoint)
+        {
+            if (statusCoordText == null)
+                return;
+
+            if (mapPoint.HasValue)
+            {
+                var gridCoords = ComputeGridCoordinates(mapPoint.Value);
+                if (gridCoords.HasValue)
+                {
+                    statusCoordText.Text = $"Cursor: {gridCoords.Value.x},{gridCoords.Value.y}";
+                    UpdateStatusTileInfo(gridCoords.Value.x, gridCoords.Value.y);
+                    return;
+                }
+            }
+
+            statusCoordText.Text = "Cursor: --";
+            UpdateStatusTileInfo(-1, -1);
+        }
+
+        private void UpdateStatusTileInfo(int gridX, int gridY)
+        {
+            if (statusTileText == null)
+                return;
+
+            if (!InBounds(gridX, gridY))
+            {
+                statusTileText.Text = "Tile: --";
+                return;
+            }
+
+            var topTile = GetTopmostTile(gridX, gridY, out var owningLayer);
+            string tileState = topTile != null ? $"Tile ({owningLayer?.Name ?? "Layer"})" : "Empty";
+            var character = GetCharacterAt(gridX, gridY);
+            var doodad = GetDoodadAt(gridX, gridY);
+
+            if (character != null)
+                tileState += $", Char: {character.Name}";
+            if (doodad != null)
+                tileState += $", Doodad: {doodad.Type}";
+
+            statusTileText.Text = $"Tile: {gridX},{gridY} ({tileState})";
+        }
+
+        private void AdjustZoom(double factor)
+        {
+            SetZoom(zoomLevel * factor);
+        }
+
+        private void ResetZoom()
+        {
+            SetZoom(1.0);
+        }
+
+        private void SetZoom(double newZoom)
+        {
+            zoomLevel = Math.Clamp(newZoom, MinZoom, MaxZoom);
+            ApplyZoom();
+        }
+
+        private void ApplyZoom()
+        {
+            if (mapCanvas != null)
+            {
+                mapCanvas.RenderTransform = new ScaleTransform(zoomLevel, zoomLevel);
+            }
+
+            UpdateStatusZoom();
+        }
+
+        private (int x, int y)? ComputeGridCoordinates(Point mapPoint)
+        {
+            var tiles = ActiveTiles;
+            int width = tiles.GetLength(0);
+            int height = tiles.GetLength(1);
+
+            if (width <= 0 || height <= 0)
+                return null;
+
+            int gridX = (int)Math.Floor(mapPoint.X / currentCellSize);
+            int gridY = (int)Math.Floor(mapPoint.Y / currentCellSize);
+
+            if (gridX < 0 || gridY < 0 || gridX >= width || gridY >= height)
+                return null;
+
+            return (gridX, gridY);
+        }
+
+        private Point GetMapPoint(PointerEventArgs e)
+        {
+            if (mapCanvas == null)
+                return default;
+
+            var position = e.GetPosition(mapCanvas);
+            return new Point(position.X / zoomLevel, position.Y / zoomLevel);
         }
 
         private void InitializeEditorUI()
@@ -376,6 +1059,18 @@ namespace DotGameAvalonia.Views
             }
         }
 
+        private void LayerList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (suppressLayerSelection)
+                return;
+
+            if (layerList?.SelectedIndex is int index && index >= 0 && index < layers.Count)
+            {
+                SetActiveLayer(index, scrollIntoView: false);
+                RenderMap();
+            }
+        }
+
         private void CmbGridSize_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
             if (suppressGridSizeEvent)
@@ -384,7 +1079,7 @@ namespace DotGameAvalonia.Views
             if (cmbGridSize?.SelectedItem is ComboBoxItem item)
             {
                 gridSize = int.Parse(item.Content?.ToString() ?? "20");
-                mapData = new TileEntry?[gridSize, gridSize];
+                ResizeAllLayers(gridSize);
                 SyncMapFromEditorState();
                 RenderMap();
             }
@@ -392,9 +1087,7 @@ namespace DotGameAvalonia.Views
 
         private void BtnClearGrid_Click(object? sender, RoutedEventArgs e)
         {
-            mapData = new TileEntry?[gridSize, gridSize];
-            SyncMapFromEditorState();
-            RenderMap();
+            ClearActiveLayer();
         }
 
         private async void BtnSaveMap_Click(object? sender, RoutedEventArgs e)
@@ -428,16 +1121,40 @@ namespace DotGameAvalonia.Views
                 var tw = (int)(numTileWidth?.Value ?? 32);
                 var th = (int)(numTileHeight?.Value ?? 32);
 
-                string?[][] mapArray = new string?[gridSize][];
-                for (int y = 0; y < gridSize; y++)
+                var activeTiles = ActiveTiles;
+                int width = activeTiles.GetLength(0);
+                int height = activeTiles.GetLength(1);
+
+                string?[][] mapArray = new string?[height][];
+                for (int y = 0; y < height; y++)
                 {
-                    mapArray[y] = new string?[gridSize];
-                    for (int x = 0; x < gridSize; x++)
-                    {
-                        var entry = mapData[x, y];
-                        mapArray[y][x] = entry?.GetSerializedValue();
-                    }
+                    mapArray[y] = new string?[width];
+                    for (int x = 0; x < width; x++)
+                        mapArray[y][x] = GetSerializedTileAt(x, y);
                 }
+
+                var layersPayload = layers.Select(layer =>
+                {
+                    var layerTiles = layer.Tiles;
+                    int layerWidth = layerTiles.GetLength(0);
+                    int layerHeight = layerTiles.GetLength(1);
+                    string?[][] serializedTiles = new string?[layerHeight][];
+                    for (int row = 0; row < layerHeight; row++)
+                    {
+                        serializedTiles[row] = new string?[layerWidth];
+                        for (int col = 0; col < layerWidth; col++)
+                            serializedTiles[row][col] = layerTiles[col, row]?.GetSerializedValue();
+                    }
+
+                    return new
+                    {
+                        id = layer.Id,
+                        name = layer.Name,
+                        isVisible = layer.IsVisible,
+                        opacity = layer.Opacity,
+                        tiles = serializedTiles
+                    };
+                }).ToList();
 
                 var characterData = characters.Select(c => new
                 {
@@ -472,11 +1189,13 @@ namespace DotGameAvalonia.Views
 
                 var mapObject = new
                 {
-                    cols = gridSize,
-                    rows = gridSize,
+                    cols = width,
+                    rows = height,
                     tileW = tw,
                     tileH = th,
                     map = mapArray,
+                    layers = layersPayload,
+                    activeLayerIndex,
                     characters = characterData,
                     doodads = doodadData,
                     triggers = triggerData,
@@ -518,47 +1237,58 @@ namespace DotGameAvalonia.Views
                     return;
                 }
 
-                var loadedMap = Map.LoadFromJson(path);
-                map = loadedMap;
+                var json = System.IO.File.ReadAllText(path);
+                var serializerOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var fileDto = JsonSerializer.Deserialize<MapFileDto>(json, serializerOptions);
 
-                gridSize = Math.Max(1, map.Cols);
-                mapData = new TileEntry?[gridSize, gridSize];
+                map = Map.LoadFromJson(path);
 
-                var mapDirectory = IOPath.GetDirectoryName(path) ?? AppContext.BaseDirectory ?? Environment.CurrentDirectory;
+                var baseDirectory = IOPath.GetDirectoryName(path) ?? AppContext.BaseDirectory ?? Environment.CurrentDirectory;
+                layers.Clear();
 
-                for (int y = 0; y < gridSize; y++)
+                int fallbackCols = Math.Max(1, fileDto?.Cols > 0 ? fileDto.Cols : map.Cols);
+                int fallbackRows = Math.Max(1, fileDto?.Rows > 0 ? fileDto.Rows : map.Rows);
+                int requestedLayerIndex = 0;
+
+                if (fileDto?.Layers != null && fileDto.Layers.Count > 0)
                 {
-                    for (int x = 0; x < gridSize; x++)
+                    foreach (var layerDto in fileDto.Layers)
                     {
-                        var stored = map.GetTileDataUrl(x, y);
-                        if (string.IsNullOrWhiteSpace(stored))
-                            continue;
+                        var buffer = CreateTileBufferFromSerialized(layerDto.Tiles, baseDirectory, fallbackCols, fallbackRows);
+                        var layer = CreateLayer(layerDto.Name ?? $"Layer {layers.Count + 1}", buffer, layerDto.Id, layerDto.IsVisible, layerDto.Opacity);
+                        layers.Add(layer);
+                    }
 
-                        if (stored.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
-                        {
-                            mapData[x, y] = TileEntry.FromDataUrl(stored);
-                        }
-                        else
-                        {
-                            var resolved = IOPath.IsPathRooted(stored)
-                                ? stored
-                                : IOPath.Combine(mapDirectory, stored);
+                    requestedLayerIndex = Math.Clamp(fileDto.ActiveLayerIndex ?? 0, 0, layers.Count - 1);
+                }
+                else
+                {
+                    var buffer = CreateTileBuffer(fallbackCols, fallbackRows);
+                    var layer = CreateLayer("Base Layer", buffer);
+                    layers.Add(layer);
 
-                            if (System.IO.File.Exists(resolved))
-                            {
-                                mapData[x, y] = new TileEntry(new Bitmap(resolved), resolved, null, stored);
-                            }
-                            else
-                            {
-                                Console.WriteLine($"Warning: Tile asset not found at {resolved}.");
-                                mapData[x, y] = null;
-                            }
+                    var tiles = layer.Tiles;
+                    for (int y = 0; y < fallbackRows; y++)
+                    {
+                        for (int x = 0; x < fallbackCols; x++)
+                        {
+                            var stored = map.GetTileDataUrl(x, y);
+                            tiles[x, y] = string.IsNullOrWhiteSpace(stored) ? null : LoadTileEntry(stored!, baseDirectory);
                         }
                     }
                 }
 
-                characters = map.Characters.Select(CloneCharacterForEditor).ToList();
-                doodads = map.Doodads.Select(CloneDoodadForEditor).ToList();
+                SetActiveLayer(requestedLayerIndex);
+
+                var primaryLayer = ActiveLayer;
+                int width = primaryLayer.Tiles.GetLength(0);
+                int height = primaryLayer.Tiles.GetLength(1);
+                gridSize = Math.Max(width, height);
+
+                characters.Clear();
+                characters.AddRange(map.Characters.Select(CloneCharacterForEditor));
+                doodads.Clear();
+                doodads.AddRange(map.Doodads.Select(CloneDoodadForEditor));
                 selectedCharacter = null;
                 selectedDoodad = null;
                 pendingCharacterTemplate = null;
@@ -568,10 +1298,12 @@ namespace DotGameAvalonia.Views
                 if (numTileHeight != null) numTileHeight.Value = map.TileH;
 
                 UpdateGridSizeSelection(gridSize);
+                UpdateLayerSelectionUI(scrollIntoView: true);
 
                 SyncMapFromEditorState();
                 RenderMap();
                 Console.WriteLine($"Loaded map from {path}.");
+                PushHistory($"Loaded map '{IOPath.GetFileName(path)}'");
             }
             catch (Exception ex)
             {
@@ -587,50 +1319,102 @@ namespace DotGameAvalonia.Views
 
         private void MapCanvas_PointerPressed(object? sender, PointerPressedEventArgs e)
         {
+            if (mapCanvas == null)
+                return;
+
             isMouseDown = true;
-            var point = e.GetPosition(mapCanvas);
-            PaintAtPosition(point, e.GetCurrentPoint(this).Properties.IsRightButtonPressed);
+            e.Pointer.Capture(mapCanvas);
+            var mapPoint = GetMapPoint(e);
+            UpdateStatusCursor(mapPoint);
+            var properties = e.GetCurrentPoint(mapCanvas).Properties;
+            PaintAtPosition(mapPoint, properties, isDrag: false);
         }
 
         private void MapCanvas_PointerMoved(object? sender, PointerEventArgs e)
         {
-            if (isMouseDown && mapCanvas != null)
+            if (mapCanvas == null)
+                return;
+
+            var mapPoint = GetMapPoint(e);
+            UpdateStatusCursor(mapPoint);
+
+            if (isMouseDown)
             {
-                var point = e.GetPosition(mapCanvas);
-                PaintAtPosition(point, e.GetCurrentPoint(this).Properties.IsRightButtonPressed);
+                var properties = e.GetCurrentPoint(mapCanvas).Properties;
+                PaintAtPosition(mapPoint, properties, isDrag: true);
             }
         }
 
         private void MapCanvas_PointerReleased(object? sender, PointerReleasedEventArgs e)
         {
             isMouseDown = false;
+            e.Pointer.Capture(null);
+            SyncMapFromEditorState();
         }
 
-        private void PaintAtPosition(Point location, bool erase)
+        private void MapCanvas_PointerWheelChanged(object? sender, PointerWheelEventArgs e)
         {
-            if (mapCanvas == null) return;
+            if (e.Delta.Y > 0)
+            {
+                AdjustZoom(1.1);
+            }
+            else if (e.Delta.Y < 0)
+            {
+                AdjustZoom(0.9);
+            }
 
-            float cellSize = mapCanvas.Width > 0 ? (float)mapCanvas.Width / gridSize : 600f / gridSize;
-            int gridX = Math.Clamp((int)(location.X / cellSize), 0, gridSize - 1);
-            int gridY = Math.Clamp((int)(location.Y / cellSize), 0, gridSize - 1);
+            e.Handled = true;
+        }
+
+        private void MapCanvas_PointerLeave(object? sender, PointerEventArgs e)
+        {
+            UpdateStatusCursor(null);
+        }
+
+        private void PaintAtPosition(Point mapPoint, PointerPointProperties properties, bool isDrag)
+        {
+            if (mapCanvas == null)
+                return;
+
+            var gridCoords = ComputeGridCoordinates(mapPoint);
+            if (!gridCoords.HasValue)
+                return;
+
+            var (gridX, gridY) = gridCoords.Value;
+            bool erase = properties.IsRightButtonPressed || currentTool == EditorTool.Eraser;
+            bool primaryPressed = properties.IsLeftButtonPressed && !erase;
 
             switch (currentMode)
             {
                 case EditorMode.Tiles:
-                    PaintTiles(gridX, gridY, erase);
+                    if (erase)
+                    {
+                        PaintTiles(gridX, gridY, true);
+                    }
+                    else if (currentTool == EditorTool.Fill && primaryPressed && !isDrag)
+                    {
+                        FloodFillTile(gridX, gridY);
+                    }
+                    else if (primaryPressed || (!isDrag && currentTool == EditorTool.Brush))
+                    {
+                        PaintTiles(gridX, gridY, false);
+                    }
                     RenderMap();
+                    SyncMapFromEditorState();
                     break;
                 case EditorMode.Characters:
+                    if (!primaryPressed && !erase)
+                        break;
                     HandleCharacterPlacement(gridX, gridY, erase);
                     RenderMap();
                     SyncMapFromEditorState();
                     break;
                 case EditorMode.Doodads:
+                    if (!primaryPressed && !erase)
+                        break;
                     HandleDoodadPlacement(gridX, gridY, erase);
                     RenderMap();
                     SyncMapFromEditorState();
-                    break;
-                default:
                     break;
             }
         }
@@ -643,6 +1427,9 @@ namespace DotGameAvalonia.Views
                 return;
             }
 
+            var tiles = ActiveTiles;
+            int width = tiles.GetLength(0);
+            int height = tiles.GetLength(1);
             int offset = brushSize / 2;
 
             for (int dy = 0; dy < brushSize; dy++)
@@ -651,18 +1438,59 @@ namespace DotGameAvalonia.Views
                 {
                     int x = gridX - offset + dx;
                     int y = gridY - offset + dy;
-                    if (x >= 0 && y >= 0 && x < gridSize && y < gridSize)
-                    {
-                        if (erase)
-                        {
-                            mapData[x, y] = null;
-                        }
-                        else if (selectedTile != null)
-                        {
-                            mapData[x, y] = selectedTile.Clone();
-                        }
-                    }
+                    if (x < 0 || y < 0 || x >= width || y >= height)
+                        continue;
+
+                    tiles[x, y] = erase ? null : selectedTile!.Clone();
                 }
+            }
+        }
+
+        private void FloodFillTile(int startX, int startY)
+        {
+            if (selectedTile == null)
+            {
+                Console.WriteLine("Select a tile before using the fill tool.");
+                return;
+            }
+
+            var tiles = ActiveTiles;
+            int width = tiles.GetLength(0);
+            int height = tiles.GetLength(1);
+
+            if (startX < 0 || startY < 0 || startX >= width || startY >= height)
+                return;
+
+            var targetValue = tiles[startX, startY]?.GetSerializedValue();
+            var replacementValue = selectedTile.GetSerializedValue();
+
+            if (targetValue == replacementValue)
+                return;
+
+            var queue = new Queue<(int x, int y)>();
+            var visited = new bool[width, height];
+            queue.Enqueue((startX, startY));
+
+            while (queue.Count > 0)
+            {
+                var (x, y) = queue.Dequeue();
+                if (x < 0 || y < 0 || x >= width || y >= height)
+                    continue;
+                if (visited[x, y])
+                    continue;
+
+                visited[x, y] = true;
+
+                var currentValue = tiles[x, y]?.GetSerializedValue();
+                if (currentValue != targetValue)
+                    continue;
+
+                tiles[x, y] = selectedTile.Clone();
+
+                queue.Enqueue((x + 1, y));
+                queue.Enqueue((x - 1, y));
+                queue.Enqueue((x, y + 1));
+                queue.Enqueue((x, y - 1));
             }
         }
 
@@ -1055,12 +1883,14 @@ namespace DotGameAvalonia.Views
                 return;
             }
 
-            for (int y = 0; y < gridSize; y++)
+            var tiles = ActiveTiles;
+            int width = tiles.GetLength(0);
+            int height = tiles.GetLength(1);
+
+            for (int x = 0; x < width; x++)
             {
-                for (int x = 0; x < gridSize; x++)
-                {
-                    mapData[x, y] = selectedTile.Clone();
-                }
+                for (int y = 0; y < height; y++)
+                    tiles[x, y] = selectedTile.Clone();
             }
 
             RenderMap();
@@ -1162,120 +1992,153 @@ namespace DotGameAvalonia.Views
         {
             currentMode = mode;
             RenderMap();
+            UpdateStatusTool();
         }
 
         private void RenderMap()
         {
-            if (mapCanvas == null) return;
+            if (mapCanvas == null)
+                return;
+
             mapCanvas.Children.Clear();
 
-            float cellSize = 600f / gridSize;
-            mapCanvas.Width = gridSize * cellSize;
-            mapCanvas.Height = gridSize * cellSize;
+            float tileWidth = (float)(numTileWidth?.Value ?? (map.TileW > 0 ? map.TileW : 32));
+            float tileHeight = (float)(numTileHeight?.Value ?? (map.TileH > 0 ? map.TileH : 32));
+            currentCellSize = Math.Max(8f, Math.Max(tileWidth, tileHeight));
 
-            // Render tiles
-            for (int x = 0; x < gridSize; x++)
+            var activeTiles = ActiveTiles;
+            int width = activeTiles.GetLength(0);
+            int height = activeTiles.GetLength(1);
+
+            mapCanvas.Width = width * currentCellSize;
+            mapCanvas.Height = height * currentCellSize;
+
+            for (int layerIndex = 0; layerIndex < layers.Count; layerIndex++)
             {
-                for (int y = 0; y < gridSize; y++)
+                var layer = layers[layerIndex];
+                if (!layer.IsVisible)
+                    continue;
+
+                var tiles = layer.Tiles;
+                int cols = tiles.GetLength(0);
+                int rows = tiles.GetLength(1);
+
+                for (int x = 0; x < cols; x++)
                 {
-                    var entry = mapData[x, y];
-                    if (entry != null)
+                    for (int y = 0; y < rows; y++)
                     {
+                        var entry = tiles[x, y];
+                        if (entry == null)
+                            continue;
+
                         var img = new Image
                         {
                             Source = entry.Bitmap,
-                            Width = cellSize,
-                            Height = cellSize
+                            Width = currentCellSize,
+                            Height = currentCellSize,
+                            Stretch = Stretch.Fill
                         };
-                        Canvas.SetLeft(img, x * cellSize);
-                        Canvas.SetTop(img, y * cellSize);
+                        Canvas.SetLeft(img, x * currentCellSize);
+                        Canvas.SetTop(img, y * currentCellSize);
                         mapCanvas.Children.Add(img);
                     }
                 }
             }
 
-            // Render characters
             if (currentMode == EditorMode.Characters || currentMode == EditorMode.Tiles)
             {
                 foreach (var character in characters)
                 {
                     var rect = new Rectangle
                     {
-                        Width = cellSize,
-                        Height = cellSize,
+                        Width = currentCellSize,
+                        Height = currentCellSize,
                         Fill = new SolidColorBrush(character.Color),
                         Stroke = Brushes.Black,
                         StrokeThickness = 2
                     };
-                    Canvas.SetLeft(rect, character.TileX * cellSize);
-                    Canvas.SetTop(rect, character.TileY * cellSize);
+                    Canvas.SetLeft(rect, character.TileX * currentCellSize);
+                    Canvas.SetTop(rect, character.TileY * currentCellSize);
                     mapCanvas.Children.Add(rect);
                 }
             }
 
-            // Render doodads
             if (currentMode == EditorMode.Doodads || currentMode == EditorMode.Tiles)
             {
                 foreach (var doodad in doodads)
                 {
                     var rect = new Rectangle
                     {
-                        Width = cellSize,
-                        Height = cellSize,
+                        Width = currentCellSize,
+                        Height = currentCellSize,
                         Fill = doodad.Sprite != null ? new ImageBrush(doodad.Sprite) : new SolidColorBrush(doodad.Color),
                         Stroke = Brushes.Gray,
                         StrokeThickness = 1
                     };
-                    Canvas.SetLeft(rect, doodad.TileX * cellSize);
-                    Canvas.SetTop(rect, doodad.TileY * cellSize);
+                    Canvas.SetLeft(rect, doodad.TileX * currentCellSize);
+                    Canvas.SetTop(rect, doodad.TileY * currentCellSize);
                     mapCanvas.Children.Add(rect);
                 }
             }
 
-            // Render grid lines
-            for (int i = 0; i <= gridSize; i++)
+            if (gridVisibilityCheck?.IsChecked != false)
             {
-                var vline = new Line
+                for (int i = 0; i <= width; i++)
                 {
-                    StartPoint = new Point(i * cellSize, 0),
-                    EndPoint = new Point(i * cellSize, gridSize * cellSize),
-                    Stroke = Brushes.LightGray,
-                    StrokeThickness = 1
-                };
-                var hline = new Line
+                    var vline = new Line
+                    {
+                        StartPoint = new Point(i * currentCellSize, 0),
+                        EndPoint = new Point(i * currentCellSize, height * currentCellSize),
+                        Stroke = Brushes.LightGray,
+                        StrokeThickness = 1
+                    };
+                    mapCanvas.Children.Add(vline);
+                }
+
+                for (int j = 0; j <= height; j++)
                 {
-                    StartPoint = new Point(0, i * cellSize),
-                    EndPoint = new Point(gridSize * cellSize, i * cellSize),
-                    Stroke = Brushes.LightGray,
-                    StrokeThickness = 1
-                };
-                mapCanvas.Children.Add(vline);
-                mapCanvas.Children.Add(hline);
+                    var hline = new Line
+                    {
+                        StartPoint = new Point(0, j * currentCellSize),
+                        EndPoint = new Point(width * currentCellSize, j * currentCellSize),
+                        Stroke = Brushes.LightGray,
+                        StrokeThickness = 1
+                    };
+                    mapCanvas.Children.Add(hline);
+                }
             }
+
+            ApplyZoom();
         }
 
         private void SyncMapFromEditorState()
         {
             int tileW = (int)(numTileWidth?.Value ?? 32);
             int tileH = (int)(numTileHeight?.Value ?? 32);
-            var tilesSnapshot = new string?[gridSize, gridSize];
+            var activeTiles = ActiveTiles;
+            int width = activeTiles.GetLength(0);
+            int height = activeTiles.GetLength(1);
+            var tilesSnapshot = new string?[height, width];
 
-            for (int y = 0; y < gridSize; y++)
+            for (int y = 0; y < height; y++)
             {
-                for (int x = 0; x < gridSize; x++)
-                {
-                    tilesSnapshot[y, x] = mapData[x, y]?.GetSerializedValue();
-                }
+                for (int x = 0; x < width; x++)
+                    tilesSnapshot[y, x] = GetSerializedTileAt(x, y);
             }
 
+            gridSize = Math.Max(width, height);
             var triggerSnapshot = new List<BehaviorTrigger>(map.Triggers);
-            map.InitializeFromArray(gridSize, gridSize, tileW, tileH, tilesSnapshot, characters, doodads, triggerSnapshot, map.ExternalTileMapAsset);
+            map.InitializeFromArray(width, height, tileW, tileH, tilesSnapshot, characters, doodads, triggerSnapshot, map.ExternalTileMapAsset);
             NotifyPreviewMapUpdate();
         }
 
         private void BtnMonoGamePreview_Click(object? sender, RoutedEventArgs e)
         {
-            LaunchMonoGamePreview();
+            InitializeRuntimePreview();
+            if (viewportTabControl != null)
+            {
+                viewportTabControl.SelectedIndex = 1;
+            }
         }
 
         private void LaunchMonoGamePreview()
@@ -1374,6 +2237,7 @@ namespace DotGameAvalonia.Views
             if (CharactersToolsPanel != null) CharactersToolsPanel.IsVisible = false;
             if (DoodadsToolsPanel != null) DoodadsToolsPanel.IsVisible = false;
             RenderMap();
+            UpdateStatusTool();
         }
 
         private void SwitchToCharactersMode(object? sender, RoutedEventArgs e)
@@ -1383,6 +2247,7 @@ namespace DotGameAvalonia.Views
             if (CharactersToolsPanel != null) CharactersToolsPanel.IsVisible = true;
             if (DoodadsToolsPanel != null) DoodadsToolsPanel.IsVisible = false;
             RenderMap();
+            UpdateStatusTool();
         }
 
         private void SwitchToDoodadsMode(object? sender, RoutedEventArgs e)
@@ -1392,6 +2257,7 @@ namespace DotGameAvalonia.Views
             if (CharactersToolsPanel != null) CharactersToolsPanel.IsVisible = false;
             if (DoodadsToolsPanel != null) DoodadsToolsPanel.IsVisible = true;
             RenderMap();
+            UpdateStatusTool();
         }
 
         private void PlaceCharacter(int tileX, int tileY, Character character)
@@ -1461,6 +2327,19 @@ namespace DotGameAvalonia.Views
         {
             map.RemoveTrigger(trigger);
             Console.WriteLine($"Removed behavior trigger '{trigger.Name}'.");
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            if (runtimePreviewHost != null)
+            {
+                runtimePreviewHost.Game = null;
+            }
+
+            runtimePreviewGame?.Dispose();
+            runtimePreviewGame = null;
+
+            base.OnClosed(e);
         }
     }
 }
