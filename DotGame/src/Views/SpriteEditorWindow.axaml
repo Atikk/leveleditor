@@ -2,76 +2,175 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="DotGameAvalonia.Views.SpriteEditorWindow"
         Title="DotGame Sprite Editor"
-        Width="1000" Height="700"
-        WindowStartupLocation="CenterScreen">
+        Width="1100" Height="750"
+        WindowStartupLocation="CenterScreen"
+        Background="#F3F4F6">
     
     <DockPanel>
-        <!-- Control Panel at Top -->
-        <StackPanel DockPanel.Dock="Top" Background="#F0F0F0" Margin="5">
-            <!-- Row 1: Canvas Size -->
-            <StackPanel Orientation="Horizontal" Margin="0,5">
-                <TextBlock Text="Canvas Width:" VerticalAlignment="Center" Margin="5,0" />
-                <NumericUpDown Name="NumCanvasWidth" Minimum="1" Maximum="512" Value="64" Width="70" />
-                <TextBlock Text="Height:" VerticalAlignment="Center" Margin="10,0,5,0" />
-                <NumericUpDown Name="NumCanvasHeight" Minimum="1" Maximum="512" Value="64" Width="70" />
-                <Button Name="BtnNewCanvas" Content="New Canvas" Margin="10,0,5,0" Width="100" />
-                <TextBlock Text="Zoom:" VerticalAlignment="Center" Margin="20,0,5,0" />
-                <NumericUpDown Name="NumZoom" Minimum="1" Maximum="20" Value="8" Width="70" />
+        <!-- Modern Toolbar -->
+        <Border DockPanel.Dock="Top" 
+                Background="White" 
+                BorderBrush="#E5E7EB"
+                BorderThickness="0,0,0,2"
+                Padding="20,16">
+            <StackPanel Spacing="14">
+                <!-- Title Row -->
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <TextBlock Text="🎨"
+                               FontSize="24"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="Sprite Editor"
+                               FontSize="20"
+                               FontWeight="Bold"
+                               Foreground="#111827"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                
+                <!-- Canvas Controls Row -->
+                <Border Background="#F9FAFB"
+                        BorderBrush="#E5E7EB"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Padding="16,12">
+                    <StackPanel Spacing="12">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="Canvas Size:"
+                                       FontWeight="SemiBold"
+                                       FontSize="13"
+                                       Foreground="#374151"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Text="Width:" VerticalAlignment="Center" Foreground="#6B7280" />
+                            <NumericUpDown Name="NumCanvasWidth" Minimum="1" Maximum="512" Value="64" Width="80" />
+                            <TextBlock Text="Height:" VerticalAlignment="Center" Foreground="#6B7280" Margin="8,0,0,0" />
+                            <NumericUpDown Name="NumCanvasHeight" Minimum="1" Maximum="512" Value="64" Width="80" />
+                            <Button Name="BtnNewCanvas" Content="🆕 New Canvas" Margin="12,0,0,0" MinWidth="130" Classes="primary" />
+                            <TextBlock Text="Zoom:" VerticalAlignment="Center" Foreground="#6B7280" Margin="20,0,0,0" />
+                            <NumericUpDown Name="NumZoom" Minimum="1" Maximum="20" Value="8" Width="70" />
+                        </StackPanel>
+                        
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="Frame Settings:"
+                                       FontWeight="SemiBold"
+                                       FontSize="13"
+                                       Foreground="#374151"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Text="Width:" VerticalAlignment="Center" Foreground="#6B7280" />
+                            <NumericUpDown Name="NumFrameWidth" Minimum="1" Maximum="512" Value="32" Width="80" />
+                            <TextBlock Text="Height:" VerticalAlignment="Center" Foreground="#6B7280" Margin="8,0,0,0" />
+                            <NumericUpDown Name="NumFrameHeight" Minimum="1" Maximum="512" Value="32" Width="80" />
+                            <TextBlock Text="Frame:" VerticalAlignment="Center" Foreground="#6B7280" Margin="20,0,0,0" />
+                            <NumericUpDown Name="NumCurrentFrame" Minimum="0" Maximum="99" Value="0" Width="70" />
+                            <Button Name="BtnPrevFrame" Content="◀" Width="40" Margin="4,0" />
+                            <Button Name="BtnNextFrame" Content="▶" Width="40" />
+                        </StackPanel>
+                        
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Button Name="BtnClear" Content="🗑️ Clear Canvas" MinWidth="130" Classes="danger" />
+                            <Button Name="BtnLoadSprite" Content="📁 Load Sprite" MinWidth="120" />
+                            <Button Name="BtnSaveSprite" Content="💾 Save Sprite" MinWidth="120" Classes="success" />
+                            <CheckBox Name="ChkShowGrid" 
+                                      Content="Show Grid" 
+                                      Margin="20,0,0,0" 
+                                      IsChecked="True"
+                                      VerticalAlignment="Center"
+                                      FontWeight="Medium" />
+                            <TextBlock Text="💡 Left-click to draw, right-click to erase" 
+                                      VerticalAlignment="Center" 
+                                      Margin="24,0,0,0" 
+                                      Foreground="#9CA3AF"
+                                      FontStyle="Italic"
+                                      FontSize="12" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
             </StackPanel>
-            
-            <!-- Row 2: Frame Settings -->
-            <StackPanel Orientation="Horizontal" Margin="0,5">
-                <TextBlock Text="Frame Width:" VerticalAlignment="Center" Margin="5,0" />
-                <NumericUpDown Name="NumFrameWidth" Minimum="1" Maximum="512" Value="32" Width="70" />
-                <TextBlock Text="Height:" VerticalAlignment="Center" Margin="10,0,5,0" />
-                <NumericUpDown Name="NumFrameHeight" Minimum="1" Maximum="512" Value="32" Width="70" />
-                <TextBlock Text="Current Frame:" VerticalAlignment="Center" Margin="20,0,5,0" />
-                <NumericUpDown Name="NumCurrentFrame" Minimum="0" Maximum="99" Value="0" Width="70" />
-                <Button Name="BtnPrevFrame" Content="&lt;" Width="40" Margin="5,0" />
-                <Button Name="BtnNextFrame" Content="&gt;" Width="40" />
-            </StackPanel>
-            
-            <!-- Row 3: Tools and Save -->
-            <StackPanel Orientation="Horizontal" Margin="0,5">
-                <Button Name="BtnClear" Content="Clear Canvas" Margin="5,0" Width="100" />
-                <Button Name="BtnLoadSprite" Content="Load Sprite" Margin="5,0" Width="100" />
-                <Button Name="BtnSaveSprite" Content="Save Sprite" Margin="5,0" Width="100" />
-                <CheckBox Name="ChkShowGrid" Content="Show Grid" Margin="20,0" IsChecked="True" />
-                <TextBlock Text="Draw pixel with left-click, erase with right-click" 
-                          VerticalAlignment="Center" Margin="20,0" Foreground="Gray" />
-            </StackPanel>
-        </StackPanel>
+        </Border>
         
         <!-- Color Palette (Left Side) -->
-        <Border DockPanel.Dock="Left" BorderBrush="Gray" BorderThickness="1" Width="180" Background="White">
-            <StackPanel Margin="5">
-                <TextBlock Text="Color Palette" FontWeight="Bold" Margin="0,5" />
-                <Border Name="SelectedColorDisplay" Width="150" Height="40" Background="Black" BorderBrush="Gray" BorderThickness="2" Margin="5" />
-                <WrapPanel Name="ColorPalette" Orientation="Horizontal" Margin="0,10,0,0" />
-                <TextBlock Text="Custom Color:" FontWeight="Bold" Margin="0,10,0,5" />
-                <StackPanel Orientation="Horizontal" Margin="0,5">
-                    <TextBlock Text="R:" VerticalAlignment="Center" Margin="2,0" />
-                    <NumericUpDown Name="NumRed" Minimum="0" Maximum="255" Value="0" Width="60" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,5">
-                    <TextBlock Text="G:" VerticalAlignment="Center" Margin="2,0" />
-                    <NumericUpDown Name="NumGreen" Minimum="0" Maximum="255" Value="0" Width="60" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,5">
-                    <TextBlock Text="B:" VerticalAlignment="Center" Margin="2,0" />
-                    <NumericUpDown Name="NumBlue" Minimum="0" Maximum="255" Value="0" Width="60" />
-                </StackPanel>
+        <Border DockPanel.Dock="Left" 
+                BorderBrush="#E5E7EB" 
+                BorderThickness="0,0,1,0" 
+                Width="220" 
+                Background="White"
+                Padding="16">
+            <StackPanel Spacing="12">
+                <TextBlock Text="🎨 Color Palette" 
+                           FontWeight="Bold"
+                           FontSize="15"
+                           Foreground="#111827" />
+                
+                <Border Name="SelectedColorDisplay" 
+                        Height="60" 
+                        Background="Black" 
+                        BorderBrush="#D1D5DB" 
+                        BorderThickness="2"
+                        CornerRadius="10">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="10" 
+                                          Color="#000000" 
+                                          Opacity="0.1"
+                                          OffsetY="2" />
+                    </Border.Effect>
+                </Border>
+                
+                <Border Background="#F9FAFB"
+                        BorderBrush="#E5E7EB"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="10">
+                    <WrapPanel Name="ColorPalette" Orientation="Horizontal" />
+                </Border>
+                
+                <TextBlock Text="Custom Color" 
+                           FontWeight="SemiBold"
+                           FontSize="13"
+                           Foreground="#374151"
+                           Margin="0,8,0,0" />
+                
+                <Border Background="#F9FAFB"
+                        BorderBrush="#E5E7EB"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="12">
+                    <StackPanel Spacing="10">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Red (R)" FontSize="12" Foreground="#6B7280" FontWeight="Medium" />
+                            <NumericUpDown Name="NumRed" Minimum="0" Maximum="255" Value="0" />
+                        </StackPanel>
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Green (G)" FontSize="12" Foreground="#6B7280" FontWeight="Medium" />
+                            <NumericUpDown Name="NumGreen" Minimum="0" Maximum="255" Value="0" />
+                        </StackPanel>
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Blue (B)" FontSize="12" Foreground="#6B7280" FontWeight="Medium" />
+                            <NumericUpDown Name="NumBlue" Minimum="0" Maximum="255" Value="0" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </Border>
         
         <!-- Pixel Canvas (Center) -->
-        <Border BorderBrush="Gray" BorderThickness="1" Background="White">
-            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-                <Canvas Name="PixelCanvas" Background="White" 
-                        PointerPressed="PixelCanvas_PointerPressed"
-                        PointerMoved="PixelCanvas_PointerMoved"
-                        PointerReleased="PixelCanvas_PointerReleased" />
-            </ScrollViewer>
+        <Border Background="#E5E7EB" Padding="16">
+            <Border BorderBrush="#D1D5DB" 
+                    BorderThickness="2" 
+                    CornerRadius="12"
+                    Background="White">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="20" 
+                                      Color="#000000" 
+                                      Opacity="0.1"
+                                      OffsetY="4" />
+                </Border.Effect>
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" 
+                              VerticalScrollBarVisibility="Auto">
+                    <Canvas Name="PixelCanvas" 
+                            Background="White" 
+                            PointerPressed="PixelCanvas_PointerPressed"
+                            PointerMoved="PixelCanvas_PointerMoved"
+                            PointerReleased="PixelCanvas_PointerReleased" />
+                </ScrollViewer>
+            </Border>
         </Border>
     </DockPanel>
     

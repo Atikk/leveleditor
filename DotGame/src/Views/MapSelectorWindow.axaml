@@ -2,22 +2,92 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="DotGameAvalonia.Views.MapSelectorWindow"
         Title="Select Map"
-        Width="400" Height="300"
+        Width="500" Height="420"
         WindowStartupLocation="CenterOwner"
-        CanResize="False">
+        CanResize="False"
+        Background="#F9FAFB">
     
-    <StackPanel Margin="20" Spacing="10">
-        <TextBlock Text="Select a map to load:" FontWeight="Bold" />
-        <TextBlock Text="Map path or URL:" />
-        <TextBox Name="TxtMapPath" Watermark="Enter path to .json map file" />
-        <TextBlock Text="Or select from samples:" />
-        <ListBox Name="LstMaps" Height="100">
-        </ListBox>
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- Header -->
+        <Border Grid.Row="0"
+                Background="White"
+                BorderBrush="#E5E7EB"
+                BorderThickness="0,0,0,1"
+                Padding="24,20">
+            <StackPanel Spacing="4">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="🗺️"
+                               FontSize="22"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="Select Map"
+                               FontSize="20"
+                               FontWeight="Bold"
+                               Foreground="#111827"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Text="Choose a map file to load into the game"
+                           FontSize="13"
+                           Foreground="#6B7280" />
+            </StackPanel>
+        </Border>
         
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,10,0,0">
-            <Button Name="BtnOk" Content="Load Map" Width="100" Height="35" />
-            <Button Name="BtnCancel" Content="Cancel" Width="80" Height="35" />
-        </StackPanel>
-    </StackPanel>
+        <!-- Content -->
+        <ScrollViewer Grid.Row="1" Padding="24,20">
+            <StackPanel Spacing="18">
+                <!-- Map Path Section -->
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Map File Path"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="#374151" />
+                    <TextBox Name="TxtMapPath" 
+                             Watermark="Enter path to .json map file (e.g., maps/mymap.json)"
+                             Height="44" />
+                    <TextBlock Text="💡 Enter the full path to your map JSON file"
+                               FontSize="12"
+                               Foreground="#9CA3AF"
+                               FontStyle="Italic" />
+                </StackPanel>
+                
+                <!-- Sample Maps Section -->
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Sample Maps"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="#374151" />
+                    <Border Background="White"
+                            BorderBrush="#E5E7EB"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="8">
+                        <ListBox Name="LstMaps" 
+                                 Height="140"
+                                 Background="Transparent"
+                                 BorderThickness="0">
+                        </ListBox>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+        
+        <!-- Footer -->
+        <Border Grid.Row="2"
+                Background="White"
+                BorderBrush="#E5E7EB"
+                BorderThickness="0,1,0,0"
+                Padding="24,16">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                <Button Name="BtnCancel" 
+                        Content="Cancel"
+                        Width="100" 
+                        Height="40" />
+                <Button Name="BtnOk" 
+                        Content="Load Map"
+                        Width="120" 
+                        Height="40"
+                        Classes="primary" />
+            </StackPanel>
+        </Border>
+    </Grid>
     
 </Window>
