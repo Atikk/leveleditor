@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:mg="clr-namespace:AvaloniaInside.MonoGame;assembly=AvaloniaInside.MonoGame"
+    xmlns:controls="clr-namespace:DotGameAvalonia.Controls"
     x:Class="DotGameAvalonia.Views.EditorWindow"
     Title="DotGame Map Editor"
     Width="1500" Height="900"
@@ -56,6 +57,7 @@
                         <Button Name="BtnSaveMap" Content="💾 Save" MinWidth="90" Classes="success" />
                         <Button Name="BtnLoadMap" Content="📁 Load" MinWidth="90" />
                         <Button Name="BtnMonoGamePreview" Content="▶️ Preview" MinWidth="100" Classes="primary" />
+                        <Button Name="BtnReloadGameData" Content="🔄 Reload Data" MinWidth="130" />
                         <Button Name="BtnSpriteEditor" Content="🎨 Sprite Editor" MinWidth="130" />
                     </StackPanel>
                 </ScrollViewer>
@@ -229,6 +231,72 @@
                         </Border>
                     </StackPanel>
                 </TabItem>
+                <TabItem Header="📚 Game Data">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="14" Spacing="12">
+                            <TextBlock Text="Runtime Data Overview"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="#374151" />
+
+                            <Border Background="#F9FAFB"
+                                    BorderBrush="#E5E7EB"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="10">
+                                <TextBlock Name="GameDataStatusText"
+                                           Text="Game data not loaded."
+                                           Foreground="#1F2937"
+                                           TextWrapping="Wrap" />
+                            </Border>
+
+                            <TextBlock Text="Dialogues"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       Foreground="#374151" />
+                            <Border Background="#FFFFFF"
+                                    BorderBrush="#E5E7EB"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="6">
+                                <ListBox Name="DialogueList"
+                                         Height="110"
+                                         BorderThickness="0"
+                                         Background="Transparent" />
+                            </Border>
+
+                            <TextBlock Text="Quests"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       Foreground="#374151" />
+                            <Border Background="#FFFFFF"
+                                    BorderBrush="#E5E7EB"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="6">
+                                <ListBox Name="QuestList"
+                                         Height="110"
+                                         BorderThickness="0"
+                                         Background="Transparent" />
+                            </Border>
+
+                            <TextBlock Text="Cutscenes"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       Foreground="#374151" />
+                            <Border Background="#FFFFFF"
+                                    BorderBrush="#E5E7EB"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="6">
+                                <ListBox Name="CutsceneList"
+                                         Height="110"
+                                         BorderThickness="0"
+                                         Background="Transparent" />
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
             </TabControl>
         </Border>
 
@@ -333,10 +401,10 @@
                     </TabItem>
                     <TabItem Header="▶️ Preview">
                         <Grid Background="#1F2937">
-                            <mg:MonoGameControl x:Name="RuntimePreviewHost"
-                                                FallbackBackground="#1F2937"
-                                                HorizontalAlignment="Stretch"
-                                                VerticalAlignment="Stretch" />
+                            <controls:RuntimePreviewHostControl x:Name="RuntimePreviewHost"
+                                                               FallbackBackground="#1F2937"
+                                                               HorizontalAlignment="Stretch"
+                                                               VerticalAlignment="Stretch" />
                         </Grid>
                     </TabItem>
                 </TabControl>

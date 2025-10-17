@@ -33,28 +33,33 @@ public sealed class CameraController
 
     public OrthographicCamera Camera => _camera;
 
+    public bool AllowKeyboardPan { get; set; } = true;
+
     public void HandleInput(GameTime gameTime, KeyboardState keyboard, MouseState mouse)
     {
-        var move = Vector2.Zero;
-
-        if (keyboard.IsKeyDown(Keys.Up) || keyboard.IsKeyDown(Keys.W))
-            move.Y -= 1f;
-        if (keyboard.IsKeyDown(Keys.Down) || keyboard.IsKeyDown(Keys.S))
-            move.Y += 1f;
-        if (keyboard.IsKeyDown(Keys.Left) || keyboard.IsKeyDown(Keys.A))
-            move.X -= 1f;
-        if (keyboard.IsKeyDown(Keys.Right) || keyboard.IsKeyDown(Keys.D))
-            move.X += 1f;
-
-        if (move != Vector2.Zero)
+        if (AllowKeyboardPan)
         {
-            move.Normalize();
-            var baseSpeed = keyboard.IsKeyDown(Keys.LeftShift) || keyboard.IsKeyDown(Keys.RightShift)
-                ? CameraPanSpeedFast
-                : CameraPanSpeed;
-            var speed = baseSpeed * (float)gameTime.ElapsedGameTime.TotalSeconds;
-            _camera.Position += move * speed;
-            ClampCameraToBounds();
+            var move = Vector2.Zero;
+
+            if (keyboard.IsKeyDown(Keys.Up) || keyboard.IsKeyDown(Keys.W))
+                move.Y -= 1f;
+            if (keyboard.IsKeyDown(Keys.Down) || keyboard.IsKeyDown(Keys.S))
+                move.Y += 1f;
+            if (keyboard.IsKeyDown(Keys.Left) || keyboard.IsKeyDown(Keys.A))
+                move.X -= 1f;
+            if (keyboard.IsKeyDown(Keys.Right) || keyboard.IsKeyDown(Keys.D))
+                move.X += 1f;
+
+            if (move != Vector2.Zero)
+            {
+                move.Normalize();
+                var baseSpeed = keyboard.IsKeyDown(Keys.LeftShift) || keyboard.IsKeyDown(Keys.RightShift)
+                    ? CameraPanSpeedFast
+                    : CameraPanSpeed;
+                var speed = baseSpeed * (float)gameTime.ElapsedGameTime.TotalSeconds;
+                _camera.Position += move * speed;
+                ClampCameraToBounds();
+            }
         }
 
         HandleMouseDrag(mouse);

@@ -1,5 +1,7 @@
 ﻿using System;
+using DotGame.Core.Async;
 using DotGame.Core.Entities;
+using DotGame.Core.Resources;
 using DotGame.Core.States;
 using DotGame.Runtime.GameData;
 using DotGame.Runtime.Input;
@@ -24,6 +26,9 @@ public sealed class Game1 : Game
     private BoxingViewportAdapter? _viewportAdapter;
     private OrthographicCamera? _camera;
     private CameraController? _cameraController;
+    private AsyncTaskScheduler? _scheduler;
+    private ResourceManager? _resourceManager;
+    private ResourceHandle<GameDataLoadReport>? _gameDataLoadHandle;
 
     public Game1()
     {
@@ -45,6 +50,10 @@ public sealed class Game1 : Game
 
     protected override void LoadContent()
     {
+        _scheduler = new AsyncTaskScheduler(workerCount: 2, workerNamePrefix: "RuntimeWorker-");
+        _resourceManager = new ResourceManager(_scheduler);
+        _scheduler.UnhandledException += ex => Console.WriteLine($"[Scheduler] Unhandled exception: {ex.Message}");
+
         var spriteBatch = new SpriteBatch(GraphicsDevice);
         _spriteBatch = spriteBatch;
         var adapter = new BoxingViewportAdapter(Window, GraphicsDevice, 1280, 720);
@@ -53,19 +62,16 @@ public sealed class Game1 : Game
         _camera = camera;
         _cameraController = new CameraController(camera, adapter);
         var gameData = new GameDataRepository();
-        var loadReport = gameData.LoadAllFromContent();
+        _runtimeContext = new RuntimeContext(Content, GraphicsDevice, spriteBatch, _world, camera, gameData, _scheduler, _resourceManager);
 
-        if (loadReport.HasErrors)
+        if (_resourceManager != null)
         {
-            foreach (var error in loadReport.Errors)
-            {
-                Console.WriteLine($"[GameData] Failed to load '{error.FilePath}': {error.Message}");
-            }
+            _gameDataLoadHandle = _resourceManager.LoadAsync(
+                key: "gamedata:default",
+                loader: _ => gameData.LoadAllFromContent(),
+                onCompleted: OnGameDataLoaded,
+                onFailed: OnGameDataFailed);
         }
-
-        Console.WriteLine($"[GameData] Loaded {loadReport.DialogueCount} dialogues, {loadReport.QuestCount} quests, {loadReport.CutsceneCount} cutscenes.");
-
-        _runtimeContext = new RuntimeContext(Content, GraphicsDevice, spriteBatch, _world, camera, gameData);
 
         var gameplay = new GameplayState(_runtimeContext);
         _stateStack.Push(gameplay);
@@ -78,6 +84,16 @@ public sealed class Game1 : Game
         _stateStack.Clear();
         _viewportAdapter?.Dispose();
         _spriteBatch?.Dispose();
+        if (_gameDataLoadHandle != null && _resourceManager != null)
+        {
+            _resourceManager.Release(_gameDataLoadHandle);
+            _gameDataLoadHandle = null;
+        }
+
+        _resourceManager?.Dispose();
+        _resourceManager = null;
+        _scheduler?.Dispose();
+        _scheduler = null;
     }
 
     protected override void Update(GameTime gameTime)
@@ -87,6 +103,8 @@ public sealed class Game1 : Game
             base.Update(gameTime);
             return;
         }
+
+    _resourceManager?.PumpMainThread();
 
         var clock = GameClock.From(gameTime.ElapsedGameTime, gameTime.TotalGameTime);
         var keyboard = Keyboard.GetState();
@@ -143,5 +161,48 @@ public sealed class Game1 : Game
             return;
 
         _cameraController?.SetWorldBounds(bounds, centerCamera);
+    }
+
+    private void OnGameDataLoaded(ResourceHandle<GameDataLoadReport> handle)
+    {
+        var report = handle.Value;
+
+        if (report.HasErrors)
+        {
+            foreach (var error in report.Errors)
+            {
+                Console.WriteLine($"[GameData] Failed to load '{error.FilePath}': {error.Message}");
+            }
+        }
+
+        Console.WriteLine($"[GameData] Loaded {report.DialogueCount} dialogues, {report.QuestCount} quests, {report.CutsceneCount} cutscenes.");
+
+        if (_resourceManager != null)
+        {
+            _resourceManager.Release(handle);
+        }
+
+        if (ReferenceEquals(_gameDataLoadHandle, handle))
+        {
+            _gameDataLoadHandle = null;
+        }
+    }
+
+    private void OnGameDataFailed(ResourceHandle<GameDataLoadReport> handle)
+    {
+        var exception = handle.Exception;
+        Console.WriteLine(exception != null
+            ? $"[GameData] Load failed: {exception.Message}"
+            : "[GameData] Load failed with unknown error.");
+
+        if (_resourceManager != null)
+        {
+            _resourceManager.Release(handle);
+        }
+
+        if (ReferenceEquals(_gameDataLoadHandle, handle))
+        {
+            _gameDataLoadHandle = null;
+        }
     }
 }

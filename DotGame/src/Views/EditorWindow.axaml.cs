@@ -5,7 +5,6 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -18,10 +17,15 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using DotGameAvalonia.Models;
-using AvaloniaInside.MonoGame;
-using DotGame.Runtime;
+using DotGameAvalonia.Controls;
+using Avalonia.Threading;
+using DotGame.Core.Async;
+using DotGame.Core.Resources;
 using DotGameAvalonia.MonoGameLayer;
+using DotGameAvalonia.Services;
+using GameDataEntrySummary = DotGameAvalonia.Services.GameDataPreviewService.GameDataEntrySummary;
 using SkiaSharp;
 using IOPath = System.IO.Path;
 
@@ -172,12 +176,20 @@ namespace DotGameAvalonia.Views
         private int brushSize = 1;
         private readonly ObservableCollection<LayerState> layers = new();
         private readonly ObservableCollection<string> historyEntries = new();
+        private readonly ObservableCollection<GameDataEntrySummary> dialogueSummaries = new();
+        private readonly ObservableCollection<GameDataEntrySummary> questSummaries = new();
+        private readonly ObservableCollection<GameDataEntrySummary> cutsceneSummaries = new();
         private int activeLayerIndex;
         private bool isMouseDown;
         private Border? selectedTileBorder;
-        private Thread? previewThread;
-        private EditorGame? previewGame;
-        private readonly object previewGameLock = new();
+    private EditorGame? previewGame;
+    private readonly object previewGameLock = new();
+        private readonly AsyncTaskScheduler scheduler = new(workerCount: 2, workerNamePrefix: "EditorWorker-");
+        private readonly ResourceManager resourceManager;
+        private readonly GameDataPreviewService gameDataPreviewService;
+        private readonly DispatcherTimer resourcePumpTimer;
+        private readonly EventHandler resourcePumpHandler;
+    private bool gameDataLoaded;
 
         private Canvas? mapCanvas;
         private WrapPanel? tilePalette;
@@ -215,8 +227,12 @@ namespace DotGameAvalonia.Views
         private CheckBox? gridVisibilityCheck;
     private ScrollViewer? viewportScroll;
     private TabControl? viewportTabControl;
-    private MonoGameControl? runtimePreviewHost;
-    private Game1? runtimePreviewGame;
+    private RuntimePreviewHostControl? runtimePreviewHost;
+    private bool runtimePreviewInitialized;
+    private TextBlock? gameDataStatusText;
+    private ListBox? dialogueList;
+    private ListBox? questList;
+    private ListBox? cutsceneList;
         private double zoomLevel = 1.0;
         private bool suppressToolToggle;
         private bool suppressLayerSelection;
@@ -545,14 +561,40 @@ namespace DotGameAvalonia.Views
 
         public EditorWindow()
         {
+            resourceManager = new ResourceManager(scheduler);
+            scheduler.UnhandledException += ex => Dispatcher.UIThread.Post(() => PushHistory($"Scheduler error: {ex.Message}"));
+            gameDataPreviewService = new GameDataPreviewService(resourceManager);
+            resourcePumpHandler = (_, _) =>
+            {
+                try
+                {
+                    resourceManager.PumpMainThread();
+                }
+                catch (Exception ex)
+                {
+                    PushHistory($"Resource pump error: {ex.Message}");
+                }
+            };
+            resourcePumpTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(16)
+            };
+            resourcePumpTimer.Tick += resourcePumpHandler;
+            resourcePumpTimer.Start();
+
             InitializeComponent();
             map = new Map();
             layers.CollectionChanged += Layers_CollectionChanged;
             InitializeLayerSystem();
             AttachEvents();
-            InitializeRuntimePreview();
             InitializeEditorUI();
             SyncMapFromEditorState();
+        }
+
+        protected override void OnOpened(EventArgs e)
+        {
+            base.OnOpened(e);
+            InitializeRuntimePreview();
         }
 
         private void InitializeComponent()
@@ -601,8 +643,26 @@ namespace DotGameAvalonia.Views
             gridVisibilityCheck = this.FindControl<CheckBox>("GridVisibilityCheck");
             viewportScroll = this.FindControl<ScrollViewer>("ViewportScroll");
             viewportTabControl = this.FindControl<TabControl>("ViewportTabControl");
-            runtimePreviewHost = this.FindControl<MonoGameControl>("RuntimePreviewHost");
+            runtimePreviewHost = this.FindControl<RuntimePreviewHostControl>("RuntimePreviewHost");
             assetTabs = this.FindControl<TabControl>("AssetTabs");
+            gameDataStatusText = this.FindControl<TextBlock>("GameDataStatusText");
+            dialogueList = this.FindControl<ListBox>("DialogueList");
+            questList = this.FindControl<ListBox>("QuestList");
+            cutsceneList = this.FindControl<ListBox>("CutsceneList");
+
+            if (runtimePreviewHost != null)
+            {
+                runtimePreviewHost.Focusable = true;
+                runtimePreviewHost.PointerPressed += RuntimePreviewHost_PointerPressed;
+                runtimePreviewHost.AttachedToVisualTree += RuntimePreviewHost_AttachedToVisualTree;
+                runtimePreviewHost.DetachedFromVisualTree += RuntimePreviewHost_DetachedFromVisualTree;
+                LogPreviewStatus("RuntimePreviewHost registered and ready for attachment events.");
+            }
+
+            if (viewportTabControl != null)
+            {
+                viewportTabControl.SelectionChanged += ViewportTabControl_SelectionChanged;
+            }
 
             HookToolToggle(toolBrush, EditorTool.Brush);
             HookToolToggle(toolEraser, EditorTool.Eraser);
@@ -622,6 +682,7 @@ namespace DotGameAvalonia.Views
             var btnSaveMap = this.FindControl<Button>("BtnSaveMap");
             var btnLoadMap = this.FindControl<Button>("BtnLoadMap");
             var btnMonoGamePreview = this.FindControl<Button>("BtnMonoGamePreview");
+            var btnReloadGameData = this.FindControl<Button>("BtnReloadGameData");
             var btnSpriteEditor = this.FindControl<Button>("BtnSpriteEditor");
             var btnTileSelect = this.FindControl<Button>("BtnTileSelect");
             var btnTileFill = this.FindControl<Button>("BtnTileFill");
@@ -646,6 +707,8 @@ namespace DotGameAvalonia.Views
                 btnLoadMap.Click += BtnLoadMap_Click;
             if (btnMonoGamePreview != null)
                 btnMonoGamePreview.Click += BtnMonoGamePreview_Click;
+            if (btnReloadGameData != null)
+                btnReloadGameData.Click += BtnReloadGameData_Click;
             if (btnSpriteEditor != null)
                 btnSpriteEditor.Click += BtnSpriteEditor_Click;
             if (btnTileSelect != null)
@@ -698,6 +761,24 @@ namespace DotGameAvalonia.Views
                 UpdateLayerSelectionUI(scrollIntoView: false);
             }
 
+            if (dialogueList != null)
+            {
+                dialogueList.ItemsSource = dialogueSummaries;
+                dialogueList.DisplayMemberBinding = new Binding(nameof(GameDataEntrySummary.Summary));
+            }
+
+            if (questList != null)
+            {
+                questList.ItemsSource = questSummaries;
+                questList.DisplayMemberBinding = new Binding(nameof(GameDataEntrySummary.Summary));
+            }
+
+            if (cutsceneList != null)
+            {
+                cutsceneList.ItemsSource = cutsceneSummaries;
+                cutsceneList.DisplayMemberBinding = new Binding(nameof(GameDataEntrySummary.Summary));
+            }
+
             if (historyList != null)
                 historyList.ItemsSource = historyEntries;
 
@@ -735,16 +816,260 @@ namespace DotGameAvalonia.Views
             SyncMapFromEditorState();
         }
 
+        protected override void OnClosed(EventArgs e)
+        {
+            resourcePumpTimer.Stop();
+            resourcePumpTimer.Tick -= resourcePumpHandler;
+
+            EditorGame? game;
+            lock (previewGameLock)
+            {
+                game = previewGame;
+            }
+
+            game?.Exit();
+
+            if (viewportTabControl != null)
+            {
+                viewportTabControl.SelectionChanged -= ViewportTabControl_SelectionChanged;
+            }
+
+            if (runtimePreviewHost != null)
+            {
+                runtimePreviewHost.PointerPressed -= RuntimePreviewHost_PointerPressed;
+                runtimePreviewHost.AttachedToVisualTree -= RuntimePreviewHost_AttachedToVisualTree;
+                runtimePreviewHost.DetachedFromVisualTree -= RuntimePreviewHost_DetachedFromVisualTree;
+                runtimePreviewHost.Game = null;
+            }
+
+            runtimePreviewInitialized = false;
+
+            if (game != null)
+            {
+                game.Dispose();
+            }
+
+            lock (previewGameLock)
+            {
+                previewGame = null;
+            }
+
+            resourceManager.Dispose();
+            scheduler.Dispose();
+
+            base.OnClosed(e);
+        }
+
+        private void EnsureGameDataLoaded()
+        {
+            if (gameDataLoaded || gameDataPreviewService.IsLoading)
+                return;
+
+            ReloadGameData();
+        }
+
+        private void ViewportTabControl_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (viewportTabControl?.SelectedIndex == 1 && runtimePreviewHost != null)
+            {
+                runtimePreviewHost.Focus();
+                LogPreviewStatus("Preview tab selected; focus requested for runtime host.");
+            }
+        }
+
+        private void RuntimePreviewHost_PointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            runtimePreviewHost?.Focus();
+            LogPreviewStatus("Pointer pressed on runtime preview host; focus requested.");
+        }
+
+        private void RuntimePreviewHost_AttachedToVisualTree(object? sender, VisualTreeAttachmentEventArgs e)
+        {
+            LogPreviewStatus("RuntimePreviewHost attached to visual tree; scheduling preview initialization.");
+            Dispatcher.UIThread.Post(InitializeRuntimePreview);
+        }
+
+        private void RuntimePreviewHost_DetachedFromVisualTree(object? sender, VisualTreeAttachmentEventArgs e)
+        {
+            runtimePreviewInitialized = false;
+            LogPreviewStatus("RuntimePreviewHost detached from visual tree; preview flagged as uninitialized.");
+        }
+
+        private void ReloadGameData()
+        {
+            if (gameDataPreviewService.IsLoading)
+            {
+                PushHistory("Game data load already in progress.");
+                UpdateGameDataStatus("Game data reload already in progress…");
+                return;
+            }
+
+            gameDataLoaded = false;
+            PushHistory("Loading game data...");
+            UpdateGameDataStatus("Loading game data…");
+            ClearGameDataSummaries();
+
+            gameDataPreviewService.ReloadAsync(
+                report =>
+                {
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        gameDataLoaded = true;
+                        var statusMessage = $"Loaded {report.DialogueCount} dialogue(s), {report.QuestCount} quest(s), {report.CutsceneCount} cutscene(s).";
+                        if (report.HasErrors)
+                            statusMessage += $" Encountered {report.Errors.Count} issue(s). See history for details.";
+
+                        PushHistory($"Game data ready: {report.DialogueCount} dialogue(s), {report.QuestCount} quest(s), {report.CutsceneCount} cutscene(s).");
+                        if (report.HasErrors)
+                        {
+                            foreach (var error in report.Errors)
+                                PushHistory($"Game data issue for '{error.FilePath}': {error.Message}");
+                        }
+
+                        UpdateGameDataStatus(statusMessage);
+                        ApplyGameDataSummaries();
+                    });
+                },
+                ex =>
+                {
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        gameDataLoaded = false;
+                        var errorMessage = $"Failed to load game data: {ex.Message}";
+                        PushHistory(errorMessage);
+                        UpdateGameDataStatus(errorMessage);
+                        ClearGameDataSummaries();
+                    });
+                });
+        }
+
+        private void UpdateGameDataStatus(string message)
+        {
+            if (gameDataStatusText == null)
+                return;
+
+            if (Dispatcher.UIThread.CheckAccess())
+            {
+                gameDataStatusText.Text = message;
+            }
+            else
+            {
+                Dispatcher.UIThread.Post(() => UpdateGameDataStatus(message));
+            }
+        }
+
+        private void ApplyGameDataSummaries()
+        {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                Dispatcher.UIThread.Post(ApplyGameDataSummaries);
+                return;
+            }
+
+            ResetCollection(dialogueSummaries, gameDataPreviewService.GetDialogueSummaries());
+            ResetCollection(questSummaries, gameDataPreviewService.GetQuestSummaries());
+            ResetCollection(cutsceneSummaries, gameDataPreviewService.GetCutsceneSummaries());
+        }
+
+        private void ClearGameDataSummaries()
+        {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                Dispatcher.UIThread.Post(ClearGameDataSummaries);
+                return;
+            }
+
+            dialogueSummaries.Clear();
+            questSummaries.Clear();
+            cutsceneSummaries.Clear();
+        }
+
+        private static void ResetCollection<T>(ObservableCollection<T> target, IEnumerable<T> values)
+        {
+            target.Clear();
+            foreach (var value in values)
+                target.Add(value);
+        }
+
         private void InitializeRuntimePreview()
         {
+            if (runtimePreviewInitialized)
+            {
+                LogPreviewStatus("InitializeRuntimePreview skipped; preview already initialized.");
+                return;
+            }
+
             if (runtimePreviewHost == null)
+            {
+                LogPreviewStatus("InitializeRuntimePreview aborted; runtimePreviewHost was null.");
                 return;
+            }
 
-            if (runtimePreviewGame != null)
+            if (runtimePreviewHost.GetVisualRoot() == null)
+            {
+                LogPreviewStatus("InitializeRuntimePreview deferred; visual root not ready yet.");
                 return;
+            }
 
-            runtimePreviewGame = new Game1();
-            runtimePreviewHost.Game = runtimePreviewGame;
+            EditorGame? existingGame;
+            lock (previewGameLock)
+            {
+                existingGame = previewGame;
+            }
+
+            if (existingGame != null)
+            {
+                runtimePreviewHost.Game = existingGame;
+                runtimePreviewInitialized = true;
+                LogPreviewStatus("Initialized runtime preview with cached EditorGame instance.");
+                return;
+            }
+
+            EnsureGameDataLoaded();
+            SyncMapFromEditorState();
+            var snapshot = map.Clone();
+            var editorGame = CreateEditorPreviewGame(snapshot);
+
+            lock (previewGameLock)
+            {
+                previewGame = editorGame;
+            }
+
+            runtimePreviewHost.Game = editorGame;
+            runtimePreviewInitialized = true;
+            LogPreviewStatus("Runtime preview initialized with new EditorGame instance.");
+        }
+
+        private EditorGame CreateEditorPreviewGame(Map mapSnapshot)
+        {
+            var editorGame = new EditorGame(mapSnapshot, resolverOverride: null, schedulerOverride: scheduler, resourceManagerOverride: resourceManager);
+            LogPreviewStatus("EditorGame instance created for runtime preview.");
+            editorGame.TriggerActivated += (trigger, entity) =>
+            {
+                var rawName = trigger.Name ?? string.Empty;
+                var triggerName = string.IsNullOrWhiteSpace(rawName) ? "UnnamedTrigger" : rawName.Trim();
+                var message = $"[Preview] Trigger '{triggerName}' fired by '{entity.Name}'.";
+
+                if (gameDataPreviewService.TryDescribeTrigger(rawName, out var description))
+                {
+                    message += " " + description;
+                }
+                else
+                {
+                    message += " No game data preview available.";
+                }
+
+                Console.WriteLine(message);
+                Dispatcher.UIThread.Post(() => PushHistory(message));
+            };
+
+            return editorGame;
+        }
+
+        private static void LogPreviewStatus(string message)
+        {
+            var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+            Console.WriteLine($"[EditorPreview] {timestamp} {message}");
         }
 
         private void HookToolToggle(ToggleButton? button, EditorTool tool)
@@ -2638,6 +2963,11 @@ namespace DotGameAvalonia.Views
             NotifyPreviewMapUpdate();
         }
 
+        private void BtnReloadGameData_Click(object? sender, RoutedEventArgs e)
+        {
+            ReloadGameData();
+        }
+
         private void BtnMonoGamePreview_Click(object? sender, RoutedEventArgs e)
         {
             InitializeRuntimePreview();
@@ -2649,53 +2979,11 @@ namespace DotGameAvalonia.Views
 
         private void LaunchMonoGamePreview()
         {
-            if (previewThread != null && previewThread.IsAlive)
+            InitializeRuntimePreview();
+            if (viewportTabControl != null)
             {
-                Console.WriteLine("MonoGame preview already running.");
-                return;
+                viewportTabControl.SelectedIndex = 1;
             }
-
-            SyncMapFromEditorState();
-            var previewMap = map.Clone();
-
-            previewThread = new Thread(() =>
-            {
-                EditorGame? localGame = null;
-                try
-                {
-                    localGame = new EditorGame(previewMap);
-                    localGame.TriggerActivated += (trigger, entity) =>
-                    {
-                        var triggerName = string.IsNullOrWhiteSpace(trigger.Name) ? "UnnamedTrigger" : trigger.Name;
-                        Console.WriteLine($"[Preview] Trigger '{triggerName}' fired by '{entity.Name}'.");
-                    };
-                    lock (previewGameLock)
-                    {
-                        previewGame = localGame;
-                    }
-
-                    localGame.Run();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"MonoGame preview error: {ex.Message}");
-                }
-                finally
-                {
-                    localGame?.Dispose();
-                    lock (previewGameLock)
-                    {
-                        previewGame = null;
-                    }
-                    previewThread = null;
-                }
-            })
-            {
-                IsBackground = true,
-                Name = "MonoGamePreviewThread"
-            };
-
-            previewThread.Start();
         }
 
         private void NotifyPreviewMapUpdate()
@@ -2880,17 +3168,5 @@ namespace DotGameAvalonia.Views
             SyncMapFromEditorState();
         }
 
-        protected override void OnClosed(EventArgs e)
-        {
-            if (runtimePreviewHost != null)
-            {
-                runtimePreviewHost.Game = null;
-            }
-
-            runtimePreviewGame?.Dispose();
-            runtimePreviewGame = null;
-
-            base.OnClosed(e);
-        }
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO;
+using DotGame.Core.Resources;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 using DotGame.Runtime.Content;
@@ -11,14 +12,16 @@ namespace DotGameAvalonia.MonoGameLayer
     {
         private readonly GraphicsDevice _gfx;
         private readonly ContentManager _content;
-        private readonly ConcurrentDictionary<string, Texture2D> _runtimeTextures = new();
-        private readonly ConcurrentDictionary<string, Texture2D> _contentTextures = new(StringComparer.OrdinalIgnoreCase);
-        private readonly ConcurrentDictionary<string, RuntimeTiledMap> _runtimeTiledMaps = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, Texture2D> _runtimeTextures = new();
+    private readonly ConcurrentDictionary<string, Texture2D> _contentTextures = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, RuntimeTiledMap> _runtimeTiledMaps = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ResourceManager? _resourceManager;
 
-        public AssetManager(ContentManager content, GraphicsDevice gfx)
+        public AssetManager(ContentManager content, GraphicsDevice gfx, ResourceManager? resourceManager = null)
         {
             _content = content ?? throw new ArgumentNullException(nameof(content));
             _gfx = gfx ?? throw new ArgumentNullException(nameof(gfx));
+            _resourceManager = resourceManager;
         }
 
         public Texture2D GetTexture(string key)
@@ -64,6 +67,67 @@ namespace DotGameAvalonia.MonoGameLayer
             var map = new RuntimeTiledMap(_gfx, path);
             _runtimeTiledMaps[normalized] = map;
             return map;
+        }
+
+        public void RequestRuntimeTiledMap(string assetName, Action<RuntimeTiledMap?> onLoaded, Action<Exception>? onError = null)
+        {
+            if (string.IsNullOrWhiteSpace(assetName))
+            {
+                onLoaded?.Invoke(null);
+                return;
+            }
+
+            var normalized = NormalizeAssetKey(assetName);
+
+            if (_runtimeTiledMaps.TryGetValue(normalized, out var cached))
+            {
+                onLoaded?.Invoke(cached);
+                return;
+            }
+
+            if (_resourceManager == null)
+            {
+                try
+                {
+                    var map = GetRuntimeTiledMap(assetName);
+                    onLoaded?.Invoke(map);
+                }
+                catch (Exception ex)
+                {
+                    onError?.Invoke(ex);
+                }
+
+                return;
+            }
+
+            _resourceManager.LoadAsync(
+                key: $"tiledmap:{normalized}",
+                loader: _ => new RuntimeTiledMap(_gfx, ResolveMapPath(normalized)),
+                onCompleted: h =>
+                {
+                    try
+                    {
+                        var map = h.Value;
+                        _runtimeTiledMaps[normalized] = map;
+                        onLoaded?.Invoke(map);
+                    }
+                    finally
+                    {
+                        _resourceManager.Release(h);
+                    }
+                },
+                onFailed: h =>
+                {
+                    try
+                    {
+                        var ex = h.Exception ?? new InvalidOperationException($"Failed to load tiled map '{normalized}'.");
+                        onError?.Invoke(ex);
+                    }
+                    finally
+                    {
+                        _resourceManager.Release(h);
+                    }
+                });
         }
 
         public void Clear()
