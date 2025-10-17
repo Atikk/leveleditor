@@ -401,5 +401,11 @@ namespace DotGameAvalonia.Models
         public int TileX { get; set; }
         public int TileY { get; set; }
         public string Name { get; set; } = string.Empty;
+
+        public override string ToString()
+        {
+            var label = string.IsNullOrWhiteSpace(Name) ? "Trigger" : Name.Trim();
+            return $"{label} @ {TileX},{TileY}";
+        }
     }
 }

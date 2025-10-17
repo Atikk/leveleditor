@@ -9,6 +9,8 @@ public sealed class GameStateStack : IDisposable
 {
     private readonly ConcurrentStack<IGameState> _states = new();
 
+    public IGameState? ActiveState => _states.TryPeek(out var state) ? state : null;
+
     public void Push(IGameState state)
     {
         ArgumentNullException.ThrowIfNull(state);

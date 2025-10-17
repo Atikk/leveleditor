@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using System.Text.Json;
@@ -10,6 +11,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
+using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
@@ -163,7 +165,7 @@ namespace DotGameAvalonia.Views
             public int? ActiveLayerIndex { get; set; }
         }
 
-        private readonly List<TileEntry> tiles = new();
+    private readonly List<TileEntry> tiles = new();
         private TileEntry? selectedTile;
         private Bitmap? spriteSheetImage;
         private int gridSize = 20;
@@ -228,7 +230,8 @@ namespace DotGameAvalonia.Views
         {
             Tiles,
             Characters,
-            Doodads
+            Doodads,
+            Triggers
         }
 
         private enum EditorTool
@@ -244,15 +247,26 @@ namespace DotGameAvalonia.Views
             Collision
         }
 
-        private EditorMode currentMode = EditorMode.Tiles;
-        private EditorTool currentTool = EditorTool.Brush;
-        private readonly List<Character> characters = new();
-        private readonly List<Doodad> doodads = new();
+    private EditorMode currentMode = EditorMode.Tiles;
+    private EditorTool currentTool = EditorTool.Brush;
+    private readonly ObservableCollection<Character> characters = new();
+    private readonly ObservableCollection<Doodad> doodads = new();
+    private readonly ObservableCollection<BehaviorTrigger> triggers = new();
         private Character? pendingCharacterTemplate;
         private Doodad? pendingDoodadTemplate;
+    private BehaviorTrigger? pendingTriggerTemplate;
         private Character? selectedCharacter;
         private Doodad? selectedDoodad;
+    private BehaviorTrigger? selectedTrigger;
         private bool suppressGridSizeEvent;
+    private bool suppressCharacterSelection;
+    private bool suppressDoodadSelection;
+    private bool suppressTriggerSelection;
+
+    private ListBox? characterList;
+    private ListBox? doodadList;
+    private ListBox? triggerList;
+    private TabControl? assetTabs;
 
         private StackPanel? TilesToolsPanel => this.FindControl<StackPanel>("TilesTools");
         private StackPanel? CharactersToolsPanel => this.FindControl<StackPanel>("CharactersTools");
@@ -293,6 +307,7 @@ namespace DotGameAvalonia.Views
             layers.Clear();
             layers.Add(CreateLayer("Base Layer"));
             activeLayerIndex = 0;
+            triggers.Clear();
         }
 
         private LayerState CreateLayer(string name, TileEntry?[,]? tiles = null, string? id = null, bool isVisible = true, double opacity = 1.0)
@@ -323,6 +338,7 @@ namespace DotGameAvalonia.Views
             activeLayerIndex = Math.Clamp(index, 0, layers.Count - 1);
             UpdateLayerSelectionUI(scrollIntoView);
             UpdateStatusTool();
+            RefreshPropertiesPanel();
         }
 
         private void UpdateLayerSelectionUI(bool scrollIntoView)
@@ -361,6 +377,8 @@ namespace DotGameAvalonia.Views
 
                 layer.Tiles = resized;
             }
+
+            RefreshPropertiesPanel();
         }
 
         private void ClearLayerTiles(LayerState layer)
@@ -529,6 +547,7 @@ namespace DotGameAvalonia.Views
         {
             InitializeComponent();
             map = new Map();
+            layers.CollectionChanged += Layers_CollectionChanged;
             InitializeLayerSystem();
             AttachEvents();
             InitializeRuntimePreview();
@@ -576,10 +595,14 @@ namespace DotGameAvalonia.Views
             propertiesPanel = this.FindControl<StackPanel>("PropertiesPanel");
             historyList = this.FindControl<ListBox>("HistoryList");
             layerList = this.FindControl<ListBox>("LayerList");
+            characterList = this.FindControl<ListBox>("CharacterList");
+            doodadList = this.FindControl<ListBox>("DoodadList");
+            triggerList = this.FindControl<ListBox>("TriggerList");
             gridVisibilityCheck = this.FindControl<CheckBox>("GridVisibilityCheck");
             viewportScroll = this.FindControl<ScrollViewer>("ViewportScroll");
             viewportTabControl = this.FindControl<TabControl>("ViewportTabControl");
             runtimePreviewHost = this.FindControl<MonoGameControl>("RuntimePreviewHost");
+            assetTabs = this.FindControl<TabControl>("AssetTabs");
 
             HookToolToggle(toolBrush, EditorTool.Brush);
             HookToolToggle(toolEraser, EditorTool.Eraser);
@@ -606,6 +629,8 @@ namespace DotGameAvalonia.Views
             var btnEditCharacter = this.FindControl<Button>("BtnEditCharacter");
             var btnAddDoodad = this.FindControl<Button>("BtnAddDoodad");
             var btnEditDoodad = this.FindControl<Button>("BtnEditDoodad");
+            var btnAddTrigger = this.FindControl<Button>("BtnAddTrigger");
+            var btnRemoveTrigger = this.FindControl<Button>("BtnRemoveTrigger");
 
             if (btnLoadSpriteSheet != null)
                 btnLoadSpriteSheet.Click += BtnLoadSpriteSheet_Click;
@@ -635,6 +660,10 @@ namespace DotGameAvalonia.Views
                 btnAddDoodad.Click += BtnAddDoodad_Click;
             if (btnEditDoodad != null)
                 btnEditDoodad.Click += BtnEditDoodad_Click;
+            if (btnAddTrigger != null)
+                btnAddTrigger.Click += BtnAddTrigger_Click;
+            if (btnRemoveTrigger != null)
+                btnRemoveTrigger.Click += BtnRemoveTrigger_Click;
             if (btnAddLayer != null)
                 btnAddLayer.Click += (_, _) => AddLayerAfterActive();
             if (btnRemoveLayer != null)
@@ -663,6 +692,7 @@ namespace DotGameAvalonia.Views
             if (layerList != null)
             {
                 layerList.ItemsSource = layers;
+                layerList.DisplayMemberBinding = new Binding(nameof(LayerState.Name));
                 layerList.SelectionChanged += LayerList_SelectionChanged;
                 layerList.SelectedIndex = activeLayerIndex;
                 UpdateLayerSelectionUI(scrollIntoView: false);
@@ -671,12 +701,34 @@ namespace DotGameAvalonia.Views
             if (historyList != null)
                 historyList.ItemsSource = historyEntries;
 
+            if (characterList != null)
+            {
+                characterList.ItemsSource = characters;
+                characterList.SelectionChanged += CharacterList_SelectionChanged;
+            }
+
+            if (doodadList != null)
+            {
+                doodadList.ItemsSource = doodads;
+                doodadList.SelectionChanged += DoodadList_SelectionChanged;
+            }
+
+            if (triggerList != null)
+            {
+                triggerList.ItemsSource = triggers;
+                triggerList.SelectionChanged += TriggerList_SelectionChanged;
+            }
+
+            if (assetTabs != null)
+                assetTabs.SelectionChanged += AssetTabs_SelectionChanged;
+
             ApplyZoom();
             SelectPrimaryTool(EditorTool.Brush);
             UpdateStatusTool();
             UpdateStatusZoom();
             UpdateStatusCursor(null);
             UpdateStatusTileInfo(-1, -1);
+            RefreshPropertiesPanel();
 
             SyncMapFromEditorState();
             RenderMap();
@@ -744,6 +796,7 @@ namespace DotGameAvalonia.Views
             {
                 EditorMode.Characters => "Characters",
                 EditorMode.Doodads => "Doodads",
+                EditorMode.Triggers => "Triggers",
                 _ => "Tiles"
             };
 
@@ -807,13 +860,253 @@ namespace DotGameAvalonia.Views
             string tileState = topTile != null ? $"Tile ({owningLayer?.Name ?? "Layer"})" : "Empty";
             var character = GetCharacterAt(gridX, gridY);
             var doodad = GetDoodadAt(gridX, gridY);
+            var trigger = GetTriggerAt(gridX, gridY);
 
             if (character != null)
                 tileState += $", Char: {character.Name}";
             if (doodad != null)
                 tileState += $", Doodad: {doodad.Type}";
+            if (trigger != null)
+                tileState += $", Trigger: {trigger.Name}";
 
             statusTileText.Text = $"Tile: {gridX},{gridY} ({tileState})";
+        }
+
+        private void Layers_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            RefreshPropertiesPanel();
+        }
+
+        private void RefreshPropertiesPanel()
+        {
+            if (propertiesPanel == null)
+                return;
+
+            propertiesPanel.Children.Clear();
+
+            if (layers.Count == 0)
+                return;
+
+            var layer = ActiveLayer;
+
+            propertiesPanel.Children.Add(new TextBlock
+            {
+                Text = "Active Layer",
+                FontSize = 13,
+                FontWeight = FontWeight.SemiBold
+            });
+
+            propertiesPanel.Children.Add(new TextBlock
+            {
+                Text = $"Id: {layer.Id}",
+                FontSize = 11,
+                Foreground = Brushes.Gray,
+                Margin = new Thickness(0, 2, 0, 0)
+            });
+
+            var sizeText = $"Size: {layer.Tiles.GetLength(0)} × {layer.Tiles.GetLength(1)}";
+            propertiesPanel.Children.Add(new TextBlock
+            {
+                Text = sizeText,
+                FontSize = 11,
+                Foreground = Brushes.Gray,
+                Margin = new Thickness(0, 2, 0, 0)
+            });
+
+            propertiesPanel.Children.Add(new TextBlock
+            {
+                Text = "Name",
+                Margin = new Thickness(0, 10, 0, 0),
+                FontWeight = FontWeight.Medium
+            });
+
+            var nameBox = new TextBox
+            {
+                Text = layer.Name
+            };
+
+            void CommitLayerName()
+            {
+                var proposed = string.IsNullOrWhiteSpace(nameBox.Text)
+                    ? "Layer"
+                    : nameBox.Text!.Trim();
+
+                if (layer.Name == proposed)
+                    return;
+
+                var previous = layer.Name;
+                layer.Name = proposed;
+                PushHistory($"Renamed layer '{previous}' to '{proposed}'");
+            }
+
+            nameBox.LostFocus += (_, _) => CommitLayerName();
+            nameBox.KeyDown += (sender, e) =>
+            {
+                if (e.Key == Key.Enter)
+                {
+                    CommitLayerName();
+                    e.Handled = true;
+                }
+            };
+
+            propertiesPanel.Children.Add(nameBox);
+
+            var visibleCheck = new CheckBox
+            {
+                Content = "Visible",
+                IsChecked = layer.IsVisible,
+                Margin = new Thickness(0, 10, 0, 0)
+            };
+
+            visibleCheck.IsCheckedChanged += (_, _) =>
+            {
+                var desired = visibleCheck.IsChecked != false;
+                if (layer.IsVisible == desired)
+                    return;
+
+                layer.IsVisible = desired;
+                RenderMap();
+            };
+
+            propertiesPanel.Children.Add(visibleCheck);
+
+            var opacityText = new TextBlock
+            {
+                Text = $"Opacity: {Math.Round(layer.Opacity * 100)}%",
+                Margin = new Thickness(0, 10, 0, 0)
+            };
+
+            propertiesPanel.Children.Add(opacityText);
+
+            var opacitySlider = new Slider
+            {
+                Minimum = 0,
+                Maximum = 1,
+                Value = layer.Opacity,
+                TickFrequency = 0.05,
+                Margin = new Thickness(0, 4, 0, 0)
+            };
+
+            opacitySlider.PropertyChanged += (_, args) =>
+            {
+                if (args.Property != RangeBase.ValueProperty)
+                    return;
+
+                var clamped = Math.Clamp(opacitySlider.Value, 0.0, 1.0);
+                if (Math.Abs(layer.Opacity - clamped) <= double.Epsilon)
+                    return;
+
+                layer.Opacity = clamped;
+                opacityText.Text = $"Opacity: {Math.Round(clamped * 100)}%";
+                RenderMap();
+            };
+
+            propertiesPanel.Children.Add(opacitySlider);
+        }
+
+        private void CharacterList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (suppressCharacterSelection)
+                return;
+
+            if (characterList?.SelectedItem is Character character)
+            {
+                selectedCharacter = character;
+                if (currentMode != EditorMode.Characters)
+                    SwitchToCharactersMode(sender, new RoutedEventArgs());
+            }
+            else
+            {
+                selectedCharacter = null;
+            }
+        }
+
+        private void DoodadList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (suppressDoodadSelection)
+                return;
+
+            if (doodadList?.SelectedItem is Doodad doodad)
+            {
+                selectedDoodad = doodad;
+                if (currentMode != EditorMode.Doodads)
+                    SwitchToDoodadsMode(sender, new RoutedEventArgs());
+            }
+            else
+            {
+                selectedDoodad = null;
+            }
+        }
+
+        private void TriggerList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (suppressTriggerSelection)
+                return;
+
+            selectedTrigger = triggerList?.SelectedItem as BehaviorTrigger;
+        }
+
+        private void AssetTabs_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (assetTabs?.SelectedItem is not TabItem tab)
+                return;
+
+            var headerText = tab.Header?.ToString();
+            if (string.IsNullOrWhiteSpace(headerText))
+                return;
+
+            if (headerText.Contains("Tiles", StringComparison.OrdinalIgnoreCase) && currentMode != EditorMode.Tiles)
+            {
+                SwitchToTilesMode(sender, new RoutedEventArgs());
+            }
+            else if (headerText.Contains("Characters", StringComparison.OrdinalIgnoreCase) && currentMode != EditorMode.Characters)
+            {
+                SwitchToCharactersMode(sender, new RoutedEventArgs());
+            }
+            else if (headerText.Contains("Doodads", StringComparison.OrdinalIgnoreCase) && currentMode != EditorMode.Doodads)
+            {
+                SwitchToDoodadsMode(sender, new RoutedEventArgs());
+            }
+            else if (headerText.Contains("Triggers", StringComparison.OrdinalIgnoreCase) && currentMode != EditorMode.Triggers)
+            {
+                SwitchToTriggersMode(sender, new RoutedEventArgs());
+            }
+        }
+
+        private void SelectCharacterInList(Character? character)
+        {
+            if (characterList == null)
+                return;
+
+            suppressCharacterSelection = true;
+            characterList.SelectedItem = character;
+            if (character != null)
+                characterList.ScrollIntoView(character);
+            suppressCharacterSelection = false;
+        }
+
+        private void SelectDoodadInList(Doodad? doodad)
+        {
+            if (doodadList == null)
+                return;
+
+            suppressDoodadSelection = true;
+            doodadList.SelectedItem = doodad;
+            if (doodad != null)
+                doodadList.ScrollIntoView(doodad);
+            suppressDoodadSelection = false;
+        }
+
+        private void SelectTriggerInList(BehaviorTrigger? trigger)
+        {
+            if (triggerList == null)
+                return;
+
+            suppressTriggerSelection = true;
+            triggerList.SelectedItem = trigger;
+            if (trigger != null)
+                triggerList.ScrollIntoView(trigger);
+            suppressTriggerSelection = false;
         }
 
         private void AdjustZoom(double factor)
@@ -1180,7 +1473,7 @@ namespace DotGameAvalonia.Views
                     OnInteract = d.OnInteract
                 }).ToList();
 
-                var triggerData = map.Triggers.Select(t => new
+                var triggerData = triggers.Select(t => new
                 {
                     TileX = t.TileX,
                     TileY = t.TileY,
@@ -1286,13 +1579,29 @@ namespace DotGameAvalonia.Views
                 gridSize = Math.Max(width, height);
 
                 characters.Clear();
-                characters.AddRange(map.Characters.Select(CloneCharacterForEditor));
+                foreach (var cloned in map.Characters.Select(CloneCharacterForEditor))
+                    characters.Add(cloned);
                 doodads.Clear();
-                doodads.AddRange(map.Doodads.Select(CloneDoodadForEditor));
+                foreach (var cloned in map.Doodads.Select(CloneDoodadForEditor))
+                    doodads.Add(cloned);
+                triggers.Clear();
+                foreach (var trigger in map.Triggers)
+                {
+                    triggers.Add(new BehaviorTrigger
+                    {
+                        TileX = trigger.TileX,
+                        TileY = trigger.TileY,
+                        Name = trigger.Name
+                    });
+                }
                 selectedCharacter = null;
                 selectedDoodad = null;
+                selectedTrigger = null;
                 pendingCharacterTemplate = null;
                 pendingDoodadTemplate = null;
+                SelectCharacterInList(null);
+                SelectDoodadInList(null);
+                SelectTriggerInList(null);
 
                 if (numTileWidth != null) numTileWidth.Value = map.TileW;
                 if (numTileHeight != null) numTileHeight.Value = map.TileH;
@@ -1416,6 +1725,37 @@ namespace DotGameAvalonia.Views
                     RenderMap();
                     SyncMapFromEditorState();
                     break;
+                case EditorMode.Triggers:
+                    if (erase)
+                    {
+                        if (!RemoveTriggerAt(gridX, gridY))
+                            Console.WriteLine($"No trigger present at ({gridX}, {gridY}).");
+                    }
+                    else if (primaryPressed)
+                    {
+                        if (pendingTriggerTemplate == null)
+                        {
+                            var existingTrigger = GetTriggerAt(gridX, gridY);
+                            if (existingTrigger != null)
+                            {
+                                selectedTrigger = existingTrigger;
+                                SelectTriggerInList(existingTrigger);
+                                Console.WriteLine($"Selected trigger '{existingTrigger.Name}' at ({gridX}, {gridY}).");
+                            }
+                            else
+                            {
+                                Console.WriteLine("No trigger template selected. Use Add Trigger to create one.");
+                            }
+                        }
+                        else
+                        {
+                            var triggerName = string.IsNullOrWhiteSpace(pendingTriggerTemplate.Name)
+                                ? "Trigger"
+                                : pendingTriggerTemplate.Name;
+                            AddBehaviorTrigger(gridX, gridY, triggerName);
+                        }
+                    }
+                    break;
             }
         }
 
@@ -1512,6 +1852,7 @@ namespace DotGameAvalonia.Views
                 {
                     selectedCharacter = existing;
                     Console.WriteLine($"Selected character {existing.Name} at ({tileX}, {tileY}).");
+                    SelectCharacterInList(existing);
                 }
                 else
                 {
@@ -1527,6 +1868,7 @@ namespace DotGameAvalonia.Views
             RemoveCharacterAt(tileX, tileY);
             characters.Add(placement);
             selectedCharacter = placement;
+            SelectCharacterInList(placement);
             Console.WriteLine($"Placed character {placement.Name} at ({tileX}, {tileY}).");
         }
 
@@ -1548,6 +1890,7 @@ namespace DotGameAvalonia.Views
                 {
                     selectedDoodad = existing;
                     Console.WriteLine($"Selected doodad {existing.Type} at ({tileX}, {tileY}).");
+                    SelectDoodadInList(existing);
                 }
                 else
                 {
@@ -1563,6 +1906,7 @@ namespace DotGameAvalonia.Views
             RemoveDoodadAt(tileX, tileY);
             doodads.Add(placement);
             selectedDoodad = placement;
+            SelectDoodadInList(placement);
             Console.WriteLine($"Placed doodad {placement.Type} at ({tileX}, {tileY}).");
         }
 
@@ -1597,6 +1941,21 @@ namespace DotGameAvalonia.Views
             RemoveDoodad(existing);
             if (ReferenceEquals(selectedDoodad, existing))
                 selectedDoodad = null;
+            return true;
+        }
+
+        private BehaviorTrigger? GetTriggerAt(int tileX, int tileY)
+        {
+            return triggers.FirstOrDefault(t => t.TileX == tileX && t.TileY == tileY);
+        }
+
+        private bool RemoveTriggerAt(int tileX, int tileY)
+        {
+            var existing = GetTriggerAt(tileX, tileY);
+            if (existing == null)
+                return false;
+
+            RemoveBehaviorTrigger(existing);
             return true;
         }
 
@@ -1858,6 +2217,103 @@ namespace DotGameAvalonia.Views
             return (updated, deleteRequested);
         }
 
+        private async Task<(BehaviorTrigger? trigger, bool confirmed)> PromptTriggerAsync(BehaviorTrigger? existing, bool requestTilePosition = true)
+        {
+            var dialog = new Window
+            {
+                Title = existing == null ? "Add Trigger" : "Edit Trigger",
+                Width = 320,
+                Height = requestTilePosition ? 260 : 200,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            };
+
+            var stack = new StackPanel { Margin = new Thickness(20), Spacing = 10 };
+            stack.Children.Add(new TextBlock { Text = "Name" });
+            var nameBox = new TextBox { Text = existing?.Name ?? string.Empty };
+            stack.Children.Add(nameBox);
+
+            NumericUpDown? tileXInput = null;
+            NumericUpDown? tileYInput = null;
+
+            if (requestTilePosition)
+            {
+                var tiles = ActiveTiles;
+                var maxX = Math.Max(0, tiles.GetLength(0) - 1);
+                var maxY = Math.Max(0, tiles.GetLength(1) - 1);
+
+                stack.Children.Add(new TextBlock { Text = "Tile X" });
+                tileXInput = new NumericUpDown
+                {
+                    Minimum = 0,
+                    Maximum = maxX,
+                    Value = existing?.TileX ?? 0
+                };
+                stack.Children.Add(tileXInput);
+
+                stack.Children.Add(new TextBlock { Text = "Tile Y" });
+                tileYInput = new NumericUpDown
+                {
+                    Minimum = 0,
+                    Maximum = maxY,
+                    Value = existing?.TileY ?? 0
+                };
+                stack.Children.Add(tileYInput);
+            }
+            else
+            {
+                var caption = new TextBlock
+                {
+                    Text = "Click on the map after saving to choose a tile.",
+                    Foreground = Brushes.Gray,
+                    FontSize = 11
+                };
+                stack.Children.Add(caption);
+            }
+
+            var buttonPanel = new StackPanel
+            {
+                Orientation = Avalonia.Layout.Orientation.Horizontal,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                Spacing = 10
+            };
+            var saveButton = new Button { Content = "Save", Width = 80 };
+            var cancelButton = new Button { Content = "Cancel", Width = 80 };
+            buttonPanel.Children.Add(saveButton);
+            buttonPanel.Children.Add(cancelButton);
+            stack.Children.Add(buttonPanel);
+
+            dialog.Content = stack;
+
+            BehaviorTrigger? result = null;
+            bool confirmed = false;
+
+            saveButton.Click += (_, _) =>
+            {
+                var name = string.IsNullOrWhiteSpace(nameBox.Text) ? "Trigger" : nameBox.Text!.Trim();
+                var tileX = requestTilePosition
+                    ? (int)(tileXInput?.Value ?? 0)
+                    : existing?.TileX ?? 0;
+                var tileY = requestTilePosition
+                    ? (int)(tileYInput?.Value ?? 0)
+                    : existing?.TileY ?? 0;
+
+                result = new BehaviorTrigger
+                {
+                    Name = name,
+                    TileX = tileX,
+                    TileY = tileY
+                };
+
+                confirmed = true;
+                dialog.Close();
+            };
+
+            cancelButton.Click += (_, _) => dialog.Close();
+
+            await dialog.ShowDialog(this);
+            return (result, confirmed);
+        }
+
         private void BtnTileSelect_Click(object? sender, RoutedEventArgs e)
         {
             SwitchToTilesMode(sender, e);
@@ -1926,6 +2382,7 @@ namespace DotGameAvalonia.Views
                 if (ReferenceEquals(selectedCharacter, target))
                     selectedCharacter = null;
                 Console.WriteLine($"Deleted character {target.Name}.");
+                SelectCharacterInList(null);
             }
             else if (updated != null)
             {
@@ -1935,6 +2392,7 @@ namespace DotGameAvalonia.Views
                     characters[index] = updated;
                     selectedCharacter = updated;
                     Console.WriteLine($"Updated character {updated.Name}.");
+                    SelectCharacterInList(updated);
                 }
             }
 
@@ -1970,6 +2428,7 @@ namespace DotGameAvalonia.Views
                 if (ReferenceEquals(selectedDoodad, target))
                     selectedDoodad = null;
                 Console.WriteLine($"Deleted doodad {target.Type}.");
+                SelectDoodadInList(null);
             }
             else if (updated != null)
             {
@@ -1981,11 +2440,37 @@ namespace DotGameAvalonia.Views
                     doodads[index] = updated;
                     selectedDoodad = updated;
                     Console.WriteLine($"Updated doodad {updated.Type}.");
+                    SelectDoodadInList(updated);
                 }
             }
 
             RenderMap();
             SyncMapFromEditorState();
+        }
+
+        private async void BtnAddTrigger_Click(object? sender, RoutedEventArgs e)
+        {
+            var (template, confirmed) = await PromptTriggerAsync(pendingTriggerTemplate, requestTilePosition: false);
+            if (!confirmed || template == null)
+                return;
+
+            pendingTriggerTemplate = template;
+            SwitchToTriggersMode(sender, e ?? new RoutedEventArgs());
+            Console.WriteLine($"Trigger template '{template.Name}' ready. Left click on the map to place it.");
+        }
+
+        private void BtnRemoveTrigger_Click(object? sender, RoutedEventArgs e)
+        {
+            if (selectedTrigger == null)
+            {
+                Console.WriteLine("Select a trigger to remove.");
+                return;
+            }
+
+            var trigger = selectedTrigger;
+            selectedTrigger = null;
+            SelectTriggerInList(null);
+            RemoveBehaviorTrigger(trigger);
         }
 
         private void SwitchMode(EditorMode mode)
@@ -2081,6 +2566,21 @@ namespace DotGameAvalonia.Views
                 }
             }
 
+            foreach (var trigger in triggers)
+            {
+                var rect = new Rectangle
+                {
+                    Width = currentCellSize,
+                    Height = currentCellSize,
+                    Fill = new SolidColorBrush(Color.FromArgb(96, 255, 215, 0)),
+                    Stroke = Brushes.Goldenrod,
+                    StrokeThickness = 1.5
+                };
+                Canvas.SetLeft(rect, trigger.TileX * currentCellSize);
+                Canvas.SetTop(rect, trigger.TileY * currentCellSize);
+                mapCanvas.Children.Add(rect);
+            }
+
             if (gridVisibilityCheck?.IsChecked != false)
             {
                 for (int i = 0; i <= width; i++)
@@ -2127,7 +2627,13 @@ namespace DotGameAvalonia.Views
             }
 
             gridSize = Math.Max(width, height);
-            var triggerSnapshot = new List<BehaviorTrigger>(map.Triggers);
+            var triggerSnapshot = triggers.Select(t => new BehaviorTrigger
+            {
+                TileX = t.TileX,
+                TileY = t.TileY,
+                Name = t.Name
+            }).ToList();
+
             map.InitializeFromArray(width, height, tileW, tileH, tilesSnapshot, characters, doodads, triggerSnapshot, map.ExternalTileMapAsset);
             NotifyPreviewMapUpdate();
         }
@@ -2260,6 +2766,16 @@ namespace DotGameAvalonia.Views
             UpdateStatusTool();
         }
 
+        private void SwitchToTriggersMode(object? sender, RoutedEventArgs e)
+        {
+            currentMode = EditorMode.Triggers;
+            if (TilesToolsPanel != null) TilesToolsPanel.IsVisible = false;
+            if (CharactersToolsPanel != null) CharactersToolsPanel.IsVisible = false;
+            if (DoodadsToolsPanel != null) DoodadsToolsPanel.IsVisible = false;
+            RenderMap();
+            UpdateStatusTool();
+        }
+
         private void PlaceCharacter(int tileX, int tileY, Character character)
         {
             if (!map.InBounds(tileX, tileY))
@@ -2272,12 +2788,18 @@ namespace DotGameAvalonia.Views
             character.TileY = tileY;
             characters.Add(character);
             Console.WriteLine($"Placed character {character.Name} at ({tileX}, {tileY}).");
+            SelectCharacterInList(character);
         }
 
         private void RemoveCharacter(Character character)
         {
             if (characters.Remove(character))
             {
+                if (ReferenceEquals(selectedCharacter, character))
+                {
+                    selectedCharacter = null;
+                    SelectCharacterInList(null);
+                }
                 Console.WriteLine($"Removed character {character.Name}.");
             }
         }
@@ -2294,12 +2816,18 @@ namespace DotGameAvalonia.Views
             doodad.TileY = tileY;
             doodads.Add(doodad);
             Console.WriteLine($"Placed doodad {doodad.Type} at ({tileX}, {tileY}).");
+            SelectDoodadInList(doodad);
         }
 
         private void RemoveDoodad(Doodad doodad)
         {
             if (doodads.Remove(doodad))
             {
+                if (ReferenceEquals(selectedDoodad, doodad))
+                {
+                    selectedDoodad = null;
+                    SelectDoodadInList(null);
+                }
                 Console.WriteLine($"Removed doodad {doodad.Type}.");
             }
         }
@@ -2319,14 +2847,37 @@ namespace DotGameAvalonia.Views
                 Name = triggerName
             };
 
-            map.AddTrigger(trigger);
+            var existing = GetTriggerAt(tileX, tileY);
+            if (existing != null)
+                triggers.Remove(existing);
+
+            triggers.Add(trigger);
+            selectedTrigger = trigger;
+            SelectTriggerInList(trigger);
             Console.WriteLine($"Added behavior trigger '{triggerName}' at ({tileX}, {tileY}).");
+            PushHistory($"Added trigger '{triggerName}' at ({tileX}, {tileY})");
+            RenderMap();
+            SyncMapFromEditorState();
         }
 
         private void RemoveBehaviorTrigger(BehaviorTrigger trigger)
         {
-            map.RemoveTrigger(trigger);
+            if (!triggers.Remove(trigger))
+            {
+                Console.WriteLine($"Trigger '{trigger.Name}' not found.");
+                return;
+            }
+
+            if (ReferenceEquals(selectedTrigger, trigger))
+            {
+                selectedTrigger = null;
+                SelectTriggerInList(null);
+            }
+
             Console.WriteLine($"Removed behavior trigger '{trigger.Name}'.");
+            PushHistory($"Removed trigger '{trigger.Name}'");
+            RenderMap();
+            SyncMapFromEditorState();
         }
 
         protected override void OnClosed(EventArgs e)

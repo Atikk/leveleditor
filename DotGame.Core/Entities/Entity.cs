@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 
 namespace DotGame.Core.Entities;
 
@@ -18,7 +19,7 @@ public sealed class Entity
     public bool Remove<TComponent>() where TComponent : class, IComponent
         => _components.TryRemove(typeof(TComponent), out _);
 
-    public bool TryGet<TComponent>(out TComponent? component) where TComponent : class, IComponent
+    public bool TryGet<TComponent>([NotNullWhen(true)] out TComponent? component) where TComponent : class, IComponent
     {
         if (_components.TryGetValue(typeof(TComponent), out var stored) && stored is TComponent typed)
         {

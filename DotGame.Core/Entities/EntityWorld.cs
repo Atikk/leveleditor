@@ -22,6 +22,11 @@ public sealed class EntityWorld
         _entities.Remove(entity);
     }
 
+    public void ClearEntities()
+    {
+        _entities.Clear();
+    }
+
     public void RegisterSystem(IEntitySystem system)
     {
         ArgumentNullException.ThrowIfNull(system);

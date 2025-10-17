@@ -22,5 +22,7 @@ namespace DotGameAvalonia.Models
             TileY = tileY;
             Type = type;
         }
+
+        public override string ToString() => $"{Type} @ {TileX},{TileY}";
     }
 }

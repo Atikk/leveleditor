@@ -1,6 +1,7 @@
 ﻿using System;
 using DotGame.Core.Entities;
 using DotGame.Core.States;
+using DotGame.Runtime.GameData;
 using DotGame.Runtime.Input;
 using DotGame.Runtime.Rendering;
 using DotGame.Runtime.Scenes;
@@ -22,6 +23,7 @@ public sealed class Game1 : Game
     private RuntimeContext? _runtimeContext;
     private BoxingViewportAdapter? _viewportAdapter;
     private OrthographicCamera? _camera;
+    private CameraController? _cameraController;
 
     public Game1()
     {
@@ -43,16 +45,31 @@ public sealed class Game1 : Game
 
     protected override void LoadContent()
     {
-    var spriteBatch = new SpriteBatch(GraphicsDevice);
-    _spriteBatch = spriteBatch;
-    var adapter = new BoxingViewportAdapter(Window, GraphicsDevice, 1280, 720);
-    _viewportAdapter = adapter;
-    var camera = new OrthographicCamera(adapter);
-    _camera = camera;
-    _runtimeContext = new RuntimeContext(Content, GraphicsDevice, spriteBatch, _world, camera);
+        var spriteBatch = new SpriteBatch(GraphicsDevice);
+        _spriteBatch = spriteBatch;
+        var adapter = new BoxingViewportAdapter(Window, GraphicsDevice, 1280, 720);
+        _viewportAdapter = adapter;
+        var camera = new OrthographicCamera(adapter);
+        _camera = camera;
+        _cameraController = new CameraController(camera, adapter);
+        var gameData = new GameDataRepository();
+        var loadReport = gameData.LoadAllFromContent();
+
+        if (loadReport.HasErrors)
+        {
+            foreach (var error in loadReport.Errors)
+            {
+                Console.WriteLine($"[GameData] Failed to load '{error.FilePath}': {error.Message}");
+            }
+        }
+
+        Console.WriteLine($"[GameData] Loaded {loadReport.DialogueCount} dialogues, {loadReport.QuestCount} quests, {loadReport.CutsceneCount} cutscenes.");
+
+        _runtimeContext = new RuntimeContext(Content, GraphicsDevice, spriteBatch, _world, camera, gameData);
 
         var gameplay = new GameplayState(_runtimeContext);
         _stateStack.Push(gameplay);
+        UpdateCameraBounds(centerCamera: true);
     }
 
     protected override void UnloadContent()
@@ -74,6 +91,8 @@ public sealed class Game1 : Game
         var clock = GameClock.From(gameTime.ElapsedGameTime, gameTime.TotalGameTime);
         var keyboard = Keyboard.GetState();
         var mouse = Mouse.GetState();
+        UpdateCameraBounds(centerCamera: false);
+        _cameraController?.HandleInput(gameTime, keyboard, mouse);
         var gamePad = GamePad.GetState(PlayerIndex.One);
         var input = new InputSnapshot(keyboard, mouse, gamePad, gamePad.IsConnected);
         var context = new RuntimeUpdateContext(_runtimeContext, clock, input);
@@ -113,6 +132,16 @@ public sealed class Game1 : Game
 
     private void OnClientSizeChanged(object? sender, EventArgs e)
     {
-        _viewportAdapter?.Reset();
+        _cameraController?.HandleViewportResize();
+    }
+
+    private void UpdateCameraBounds(bool centerCamera)
+    {
+        var gameplay = _stateStack.ActiveState as GameplayState;
+        var bounds = gameplay?.WorldBounds ?? RectangleF.Empty;
+        if (bounds == RectangleF.Empty)
+            return;
+
+        _cameraController?.SetWorldBounds(bounds, centerCamera);
     }
 }

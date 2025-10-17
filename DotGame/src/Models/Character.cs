@@ -259,5 +259,7 @@ namespace DotGameAvalonia.Models
             SetAnimation(AnimationState.Attack);
             return target.TakeDamage(Attributes.Attack);
         }
+
+        public override string ToString() => $"{Name} ({Class}) @ {TileX},{TileY}";
     }
 }

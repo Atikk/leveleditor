@@ -1,5 +1,6 @@
 using System;
 using DotGame.Core.Entities;
+using DotGame.Runtime.GameData;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 using MonoGame.Extended;
@@ -8,13 +9,14 @@ namespace DotGame.Runtime.Rendering;
 
 public sealed class RuntimeContext
 {
-    public RuntimeContext(ContentManager content, GraphicsDevice graphicsDevice, SpriteBatch spriteBatch, EntityWorld world, OrthographicCamera camera)
+    public RuntimeContext(ContentManager content, GraphicsDevice graphicsDevice, SpriteBatch spriteBatch, EntityWorld world, OrthographicCamera camera, GameDataRepository gameData)
     {
         Content = content ?? throw new ArgumentNullException(nameof(content));
         GraphicsDevice = graphicsDevice ?? throw new ArgumentNullException(nameof(graphicsDevice));
         SpriteBatch = spriteBatch ?? throw new ArgumentNullException(nameof(spriteBatch));
         World = world ?? throw new ArgumentNullException(nameof(world));
         Camera = camera ?? throw new ArgumentNullException(nameof(camera));
+        GameData = gameData ?? throw new ArgumentNullException(nameof(gameData));
     }
 
     public ContentManager Content { get; }
@@ -26,4 +28,6 @@ public sealed class RuntimeContext
     public EntityWorld World { get; }
 
     public OrthographicCamera Camera { get; }
+
+    public GameDataRepository GameData { get; }
 }

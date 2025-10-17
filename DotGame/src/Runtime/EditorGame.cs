@@ -30,10 +30,11 @@ namespace DotGameAvalonia.MonoGameLayer
         private BoxingViewportAdapter? _viewportAdapter;
         private Texture2D? _whitePixel;
         private OrthographicCamera? _camera;
-    private RuntimeTiledMap? _runtimeTiledMap;
+        private RuntimeTiledMap? _runtimeTiledMap;
         private Map? _pendingMap;
         private bool _mapDirty;
         private Entity? _playerEntity;
+        private CameraController? _cameraController;
 
         public event Action<BehaviorTrigger, Entity>? TriggerActivated;
 
@@ -70,16 +71,21 @@ namespace DotGameAvalonia.MonoGameLayer
             _camera = new OrthographicCamera(_viewportAdapter);
             _whitePixel = new Texture2D(GraphicsDevice, 1, 1);
             _whitePixel.SetData(new[] { Microsoft.Xna.Framework.Color.White });
+            _cameraController = new CameraController(_camera, _viewportAdapter);
+            Window.ClientSizeChanged += OnClientSizeChanged;
 
             _world = new GameWorld();
             BuildWorldFromMap();
             LoadExternalTileMap();
+            UpdateCameraBounds(centerCamera: true);
         }
 
         protected override void Update(GameTime gameTime)
         {
             ApplyPendingMapSwap();
-            HandleCameraInput(gameTime);
+            var keyboard = Keyboard.GetState();
+            var mouse = Mouse.GetState();
+            _cameraController?.HandleInput(gameTime, keyboard, mouse);
             _world?.Update(gameTime);
             base.Update(gameTime);
         }
@@ -112,6 +118,7 @@ namespace DotGameAvalonia.MonoGameLayer
         {
             if (disposing)
             {
+                Window.ClientSizeChanged -= OnClientSizeChanged;
                 _assets?.Clear();
                 _whitePixel?.Dispose();
                 _runtimeTiledMap = null;
@@ -153,6 +160,7 @@ namespace DotGameAvalonia.MonoGameLayer
             _assets?.Clear();
             BuildWorldFromMap();
             LoadExternalTileMap();
+            UpdateCameraBounds(centerCamera: true);
         }
 
         private void LoadExternalTileMap()
@@ -173,44 +181,6 @@ namespace DotGameAvalonia.MonoGameLayer
             {
                 Console.WriteLine($"Failed to load tiled map '{_map.ExternalTileMapAsset}': {ex.Message}");
                 _runtimeTiledMap = null;
-            }
-        }
-
-        private void HandleCameraInput(GameTime gameTime)
-        {
-            var camera = _camera;
-            if (camera == null)
-                return;
-
-            var keyboard = Keyboard.GetState();
-            var move = Vector2.Zero;
-
-            if (keyboard.IsKeyDown(Keys.Up) || keyboard.IsKeyDown(Keys.W))
-                move.Y -= 1f;
-            if (keyboard.IsKeyDown(Keys.Down) || keyboard.IsKeyDown(Keys.S))
-                move.Y += 1f;
-            if (keyboard.IsKeyDown(Keys.Left) || keyboard.IsKeyDown(Keys.A))
-                move.X -= 1f;
-            if (keyboard.IsKeyDown(Keys.Right) || keyboard.IsKeyDown(Keys.D))
-                move.X += 1f;
-
-            if (move != Vector2.Zero)
-            {
-                move.Normalize();
-                var speed = 300f * (float)gameTime.ElapsedGameTime.TotalSeconds;
-                camera.Position += move * speed;
-            }
-
-            var zoomDelta = 0f;
-            if (keyboard.IsKeyDown(Keys.OemPlus) || keyboard.IsKeyDown(Keys.Add))
-                zoomDelta += 1f;
-            if (keyboard.IsKeyDown(Keys.OemMinus) || keyboard.IsKeyDown(Keys.Subtract))
-                zoomDelta -= 1f;
-
-            if (Math.Abs(zoomDelta) > float.Epsilon)
-            {
-                var zoomChange = 1f + zoomDelta * 0.75f * (float)gameTime.ElapsedGameTime.TotalSeconds;
-                camera.Zoom = MathHelper.Clamp(camera.Zoom * zoomChange, 0.25f, 4f);
             }
         }
 
@@ -315,6 +285,19 @@ namespace DotGameAvalonia.MonoGameLayer
 
                 _world.AddEntity(entity);
             }
+        }
+
+        private void UpdateCameraBounds(bool centerCamera)
+        {
+            var width = Math.Max(1, _map.Cols * _map.TileW);
+            var height = Math.Max(1, _map.Rows * _map.TileH);
+            var bounds = new RectangleF(0, 0, width, height);
+            _cameraController?.SetWorldBounds(bounds, centerCamera);
+        }
+
+        private void OnClientSizeChanged(object? sender, EventArgs e)
+        {
+            _cameraController?.HandleViewportResize();
         }
 
         private bool IsPlayerCharacter(Character character, int index)

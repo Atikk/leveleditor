@@ -1,0 +1,47 @@
+{
+  "id": "sample_main_quest",
+  "name": "The Lost Lantern",
+  "description": "Help the village recover its magical lantern to lift the night fog.",
+  "stages": [
+    {
+      "id": "investigate_square",
+      "narrative": "Talk to the villagers and search the town square for clues.",
+      "objectives": [
+        {
+          "id": "speak_with_elder",
+          "description": "Speak with Elder Heron near the fountain.",
+          "isOptional": false,
+          "completionTriggers": ["dialogue:elder_heron:intro_complete"]
+        },
+        {
+          "id": "inspect_clues",
+          "description": "Inspect three clues scattered around the square.",
+          "isOptional": false,
+          "completionTriggers": [
+            "trigger:clue_poster",
+            "trigger:clue_cart",
+            "trigger:clue_pawprints"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "retrieve_lantern",
+      "narrative": "Enter the forest glade and reclaim the lantern from the goblin camp.",
+      "objectives": [
+        {
+          "id": "defeat_goblin_guard",
+          "description": "Defeat the goblin guard who stole the lantern.",
+          "isOptional": false,
+          "completionTriggers": ["combat:goblin_guard:defeated"]
+        },
+        {
+          "id": "recover_lantern",
+          "description": "Pick up the enchanted lantern from the altar.",
+          "isOptional": false,
+          "completionTriggers": ["item:lantern:collected"]
+        }
+      ]
+    }
+  ]
+}

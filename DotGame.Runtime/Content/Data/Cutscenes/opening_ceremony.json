@@ -1,0 +1,35 @@
+{
+  "id": "opening_ceremony",
+  "steps": [
+    {
+      "type": "fade_in",
+      "duration": "00:00:02",
+      "parameters": {
+        "color": "#000000"
+      }
+    },
+    {
+      "type": "pan_camera",
+      "duration": "00:00:03",
+      "parameters": {
+        "targetX": "320",
+        "targetY": "180"
+      }
+    },
+    {
+      "type": "show_dialogue",
+      "duration": "00:00:05",
+      "parameters": {
+        "graphId": "elder_heron_intro",
+        "nodeId": "start"
+      }
+    },
+    {
+      "type": "fade_out",
+      "duration": "00:00:02",
+      "parameters": {
+        "color": "#000000"
+      }
+    }
+  ]
+}

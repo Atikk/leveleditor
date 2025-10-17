@@ -1,0 +1,44 @@
+{
+  "id": "elder_heron_intro",
+  "nodes": [
+    {
+      "id": "start",
+      "speaker": "Elder Heron",
+      "text": "The fog has swallowed our lantern's light. Will you help us, traveler?",
+      "choices": [
+        {
+          "id": "accept",
+          "text": "I will find the lantern.",
+          "nextNodeId": "gratitude",
+          "requiredFlags": []
+        },
+        {
+          "id": "hesitate",
+          "text": "What happened here?",
+          "nextNodeId": "explain",
+          "requiredFlags": []
+        }
+      ]
+    },
+    {
+      "id": "explain",
+      "speaker": "Elder Heron",
+      "text": "A goblin raiding party slipped in at dusk. Without the lantern, the fog will choke the crops.",
+      "choices": [
+        {
+          "id": "accept_after_explain",
+          "text": "Then I have no time to waste.",
+          "nextNodeId": "gratitude",
+          "requiredFlags": []
+        }
+      ]
+    },
+    {
+      "id": "gratitude",
+      "speaker": "Elder Heron",
+      "text": "Thank you. Search the town square for clues. I'll mark what we know on your map.",
+      "nextNodeId": null,
+      "choices": []
+    }
+  ]
+}
