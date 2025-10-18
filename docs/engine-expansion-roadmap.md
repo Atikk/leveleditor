@@ -25,10 +25,14 @@ This roadmap captures the multi-part initiative outlined for the editor/runtime 
 
 **Dependencies:** Logging docs (done), platform interface spec (TBD).
 
+**Status (Oct 18, 2025):** Deterministic timing loop now powers both the Avalonia runtime preview host and the standalone runtime entry via `FrameLoopController`, emitting frame-budget telemetry through the logging stack. Drift snapshots are cached for upcoming UI surfacing, and a platform service abstraction with a Windows stub is available for allocator/job-system integration work.
+
 **Next Actions:**
-1. Draft `Platform` interface (threads, file I/O, time sources) with platform-specific stubs.
+1. Wire new platform services into the Avalonia host and shared tooling bootstrap so editor utilities share the same thread/file/time contracts.
 2. Prototype arena allocator with instrumentation hooks feeding logs/telemetry.
 3. Design job system API surface, schedule spike comparing work-stealing vs. bifurcated queues.
+4. Expose preview timing telemetry in-editor (status widget/log panel) and capture JSON snapshots for QA checklist automation.
+5. Author short design note describing platform service extension points (Linux/macOS) and file it alongside the blueprint.
 
 ---
 
@@ -157,9 +161,10 @@ This roadmap captures the multi-part initiative outlined for the editor/runtime 
 
 ### Immediate Coordination Checklist
 
-- [ ] Publish "Core Concepts Blueprint" covering timing, rendering abstraction, data layout utilities, and modularity docs.
+- [x] Publish "Core Concepts Blueprint" covering timing, rendering abstraction, data layout utilities, and modularity docs. (See `docs/core-concepts-blueprint.md`.)
+- [ ] Roll deterministic frame loop integration across runtime hosts and surface telemetry in editor UI. *(Runtime entry complete; UI telemetry pending.)*
 - [ ] Assign leads for Part II subsystems (allocators, job system, platform layer).
 - [ ] Schedule rendering architecture kickoff workshop (Part III).
 - [ ] Open RFC template for cross-team design proposals referencing roadmap sections.
 
-Keep this roadmap under version control (`docs/engine-expansion-roadmap.md`) and review it during planning meetings so scope changes and completed work remain visible.
+Keep this roadmap under version control (`docs/engine-expansion-roadmap.md`) and review it during planning meetings so scope changes and completed work remain visible. Reference the blueprint at `docs/core-concepts-blueprint.md` for shared technical contracts.

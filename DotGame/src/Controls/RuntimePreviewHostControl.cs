@@ -1,4 +1,8 @@
 ﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
+using DotGame.Core.Logging;
+using DotGame.Core.Timing;
 using global::Avalonia;
 using global::Avalonia.Controls;
 using global::Avalonia.Input;
@@ -10,15 +14,18 @@ using Microsoft.Xna.Framework;
 namespace Dotgame.Avalonia.Controls
 {
     /// <summary>
-    /// Wraps <see cref="MonoGameControl"/> and pumps the MonoGame game loop with a dispatcher timer
-    /// so the preview keeps ticking even when the tab is not actively rendering.
+    /// Wraps <see cref="MonoGameControl"/> and pumps the MonoGame game loop using the shared
+    /// <see cref="FrameLoopController"/> so preview timing aligns with deterministic loop tooling.
     /// </summary>
     public sealed class RuntimePreviewHostControl : ContentControl
     {
         private readonly MonoGameControl _innerControl;
-        private DispatcherTimer? _loop;
-        private bool _isTicking;
-        private long _lastLongTickLog;
+        private readonly ILogger logger = LogManager.GetLogger<RuntimePreviewHostControl>();
+        private CancellationTokenSource? loopCancellation;
+        private Task? loopTask;
+        private FrameTimingInfo latestTiming;
+        private bool hasTiming;
+        private readonly object timingGate = new();
 
         public RuntimePreviewHostControl()
         {
@@ -63,67 +70,130 @@ namespace Dotgame.Avalonia.Controls
 
         private void StartLoop()
         {
-            if (_loop != null)
+            if (loopTask != null)
                 return;
 
-            _loop = new DispatcherTimer(TimeSpan.FromMilliseconds(1000.0 / 60.0), DispatcherPriority.Render, OnLoopTick);
-            _loop.Start();
+            loopCancellation = new CancellationTokenSource();
+
+            var controller = new FrameLoopController(TimeSource.Current, 60.0);
+            var listener = new FrameTimingLogListener(LogManager.GetLogger("RuntimePreview"));
+            controller.RegisterListener(listener);
+
+            loopTask = Task.Run(() => RunLoop(controller, loopCancellation.Token));
         }
 
         private void StopLoop()
         {
-            if (_loop == null)
+            var cts = loopCancellation;
+            if (cts == null)
                 return;
 
-            _loop.Stop();
-            _loop.Tick -= OnLoopTick;
-            _loop = null;
-        }
+            loopCancellation = null;
 
-        private void OnLoopTick(object? sender, EventArgs e)
-        {
-            if (_isTicking)
-                return;
+            cts.Cancel();
 
-            var previewGame = Game;
-            if (previewGame == null)
+            var task = loopTask;
+            loopTask = null;
+
+            if (task != null)
             {
-                _innerControl.InvalidateVisual();
-                return;
+                _ = task.ContinueWith(t =>
+                {
+                    if (t.Exception != null)
+                        logger.Error("Runtime preview loop terminated with errors.", t.Exception.Flatten());
+                    cts.Dispose();
+                }, TaskScheduler.Default);
+            }
+            else
+            {
+                cts.Dispose();
             }
 
-            _isTicking = true;
-            var startTick = Environment.TickCount64;
+            lock (timingGate)
+            {
+                hasTiming = false;
+                latestTiming = default;
+            }
+        }
 
+        public bool TryGetLatestTiming(out FrameTimingInfo timing)
+        {
+            lock (timingGate)
+            {
+                if (!hasTiming)
+                {
+                    timing = default;
+                    return false;
+                }
+
+                timing = latestTiming;
+                return true;
+            }
+        }
+
+        private void RunLoop(FrameLoopController controller, CancellationToken cancellationToken)
+        {
             try
             {
-                previewGame.RunOneFrame();
+                controller.Run(
+                    fixedStep => ExecuteFrame(fixedStep, cancellationToken),
+                    timing =>
+                    {
+                        lock (timingGate)
+                        {
+                            latestTiming = timing;
+                            hasTiming = true;
+                        }
+                    },
+                    cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected during shutdown.
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[RuntimePreviewHost] Tick error: {ex}");
+                logger.Error("Runtime preview loop encountered an error.", ex);
             }
-            finally
-            {
-                _isTicking = false;
-            }
-
-            var duration = Environment.TickCount64 - startTick;
-            if (duration > 16 && ShouldLogLongTick())
-            {
-                Console.WriteLine($"[RuntimePreviewHost] Tick duration {duration} ms");
-            }
-
-            _innerControl.InvalidateVisual();
         }
 
-        private bool ShouldLogLongTick()
+        private bool ExecuteFrame(TimeSpan _, CancellationToken cancellationToken)
         {
-            var now = Environment.TickCount64;
-            if (_lastLongTickLog != 0 && now - _lastLongTickLog < 1000)
+            if (cancellationToken.IsCancellationRequested)
                 return false;
 
-            _lastLongTickLog = now;
+            var previewGame = Game;
+            if (previewGame == null)
+                return !cancellationToken.IsCancellationRequested;
+
+            using var completion = new ManualResetEventSlim(false);
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                try
+                {
+                    previewGame.RunOneFrame();
+                    _innerControl.InvalidateVisual();
+                }
+                catch (Exception ex)
+                {
+                    logger.Error("Runtime preview frame execution failed.", ex);
+                }
+                finally
+                {
+                    completion.Set();
+                }
+            }, DispatcherPriority.Render);
+
+            try
+            {
+                completion.Wait(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return false;
+            }
+
             return true;
         }
     }

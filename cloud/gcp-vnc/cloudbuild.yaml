@@ -1,0 +1,15 @@
+substitutions:
+  _REGION: us-central1
+  _REPOSITORY: leveleditor
+  _TAG: latest
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - cloud/gcp-vnc/Dockerfile
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/leveleditor-vnc:${_TAG}
+      - .
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/leveleditor-vnc:${_TAG}
