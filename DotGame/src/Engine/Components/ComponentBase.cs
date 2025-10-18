@@ -1,7 +1,7 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace DotGameAvalonia.Engine.Components
+namespace Dotgame.Avalonia.Engine.Components
 {
     /// <summary>
     /// Convenience base class that supplies common plumbing for game components.
@@ -30,3 +30,4 @@ namespace DotGameAvalonia.Engine.Components
         }
     }
 }
+

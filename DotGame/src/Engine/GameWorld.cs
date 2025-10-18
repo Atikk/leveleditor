@@ -1,9 +1,9 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using DotGameAvalonia.Engine.Systems;
+using Dotgame.Avalonia.Engine.Systems;
 
-namespace DotGameAvalonia.Engine
+namespace Dotgame.Avalonia.Engine
 {
     /// <summary>
     /// Maintains a collection of entities and coordinates global update and draw calls.
@@ -17,6 +17,7 @@ namespace DotGameAvalonia.Engine
 
         public T AddEntity<T>(T entity) where T : Entity
         {
+            entity.ClearRemovalFlag();
             _entities.Add(entity);
             return entity;
         }
@@ -39,6 +40,14 @@ namespace DotGameAvalonia.Engine
             }
 
             _collisionSystem.Process(gameTime, _entities);
+
+            for (var i = _entities.Count - 1; i >= 0; i--)
+            {
+                if (_entities[i].IsMarkedForRemoval)
+                {
+                    _entities.RemoveAt(i);
+                }
+            }
         }
 
         public void Draw(GameTime gameTime, SpriteBatch spriteBatch, Matrix viewMatrix)
@@ -52,3 +61,4 @@ namespace DotGameAvalonia.Engine
         }
     }
 }
+

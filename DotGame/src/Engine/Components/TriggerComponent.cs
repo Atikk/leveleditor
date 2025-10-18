@@ -1,7 +1,7 @@
-using System;
-using DotGameAvalonia.Models;
+﻿using System;
+using Dotgame.Avalonia.Models;
 
-namespace DotGameAvalonia.Engine.Components
+namespace Dotgame.Avalonia.Engine.Components
 {
     /// <summary>
     /// Associates an entity with a behavior trigger definition from the map.
@@ -16,3 +16,4 @@ namespace DotGameAvalonia.Engine.Components
         public BehaviorTrigger Trigger { get; }
     }
 }
+

@@ -1,9 +1,9 @@
-using Avalonia;
-using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Markup.Xaml;
-using DotGameAvalonia.Views;
+﻿using global::Avalonia;
+using global::Avalonia.Controls.ApplicationLifetimes;
+using global::Avalonia.Markup.Xaml;
+using Dotgame.Avalonia.Views;
 
-namespace DotGameAvalonia;
+namespace Dotgame.Avalonia;
 
 public partial class App : Application
 {
@@ -22,3 +22,5 @@ public partial class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 }
+
+

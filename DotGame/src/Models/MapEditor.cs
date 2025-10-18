@@ -1,7 +1,7 @@
-using System;
-using DotGameAvalonia.Models;
+﻿using System;
+using Dotgame.Avalonia.Models;
 
-namespace DotGameAvalonia.Models
+namespace Dotgame.Avalonia.Models
 {
     public static class MapEditor
     {

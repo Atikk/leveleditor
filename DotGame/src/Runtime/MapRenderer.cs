@@ -1,8 +1,8 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using DotGameAvalonia.Models;
+using Dotgame.Avalonia.Models;
 
-namespace DotGameAvalonia.MonoGameLayer
+namespace Dotgame.Avalonia.MonoGameLayer
 {
     public interface ITextureResolver
     {
@@ -32,16 +32,40 @@ namespace DotGameAvalonia.MonoGameLayer
             var transform = viewMatrix ?? Matrix.Identity;
             _sb.Begin(samplerState: SamplerState.PointClamp, transformMatrix: transform);
 
-            // Tiles (supports file paths and base64 data URLs)
+            var tileset = map.Tileset;
+            Texture2D? atlasTexture = null;
+            if (map.HasTileIds && tileset != null)
+            {
+                var atlasKey = tileset.AbsoluteTexturePath ?? tileset.TextureKey;
+                if (!string.IsNullOrWhiteSpace(atlasKey))
+                {
+                    atlasTexture = _resolver.Resolve(atlasKey);
+                }
+            }
+
+            // Tiles (prefer shared atlas via tile IDs, fall back to data URLs)
             for (int y = 0; y < map.Rows; y++)
             {
                 for (int x = 0; x < map.Cols; x++)
                 {
+                    var dst = new Rectangle((int)origin.X + x * map.TileW, (int)origin.Y + y * map.TileH, map.TileW, map.TileH);
+                    var tileId = map.GetTileId(x, y);
+
+                    if (atlasTexture != null && tileId.HasValue && tileset != null)
+                    {
+                        if (tileset.TryGetSourceRegion(tileId.Value, atlasTexture.Width, out var region))
+                        {
+                            var src = new Rectangle(region.X, region.Y, region.Width, region.Height);
+                            _sb.Draw(atlasTexture, dst, src, Color.White);
+                            continue;
+                        }
+                    }
+
                     var key = map.GetTileDataUrl(x, y);
-                    if (string.IsNullOrEmpty(key)) continue;
+                    if (string.IsNullOrEmpty(key))
+                        continue;
 
                     var tex = _resolver.Resolve(key);
-                    var dst = new Rectangle((int)origin.X + x * map.TileW, (int)origin.Y + y * map.TileH, map.TileW, map.TileH);
                     _sb.Draw(tex, dst, Color.White);
                 }
             }
@@ -80,3 +104,4 @@ namespace DotGameAvalonia.MonoGameLayer
         private Texture2D? _pixel;
     }
 }
+

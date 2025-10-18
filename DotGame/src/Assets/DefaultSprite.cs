@@ -1,8 +1,8 @@
-using System.IO;
-using Avalonia.Media.Imaging;
+﻿using System.IO;
+using global::Avalonia.Media.Imaging;
 using SkiaSharp;
 
-namespace DotGameAvalonia.Assets
+namespace Dotgame.Avalonia.Assets
 {
     public static class DefaultSprite
     {
@@ -41,3 +41,5 @@ namespace DotGameAvalonia.Assets
         }
     }
 }
+
+

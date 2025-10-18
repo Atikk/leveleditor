@@ -27,4 +27,8 @@
     <ProjectReference Include="..\DotGame.Runtime\DotGame.Runtime.csproj" />
     <ProjectReference Include="..\DotGame.Core\DotGame.Core.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="src\Services\GameDataPreviewService.cs" />
+  </ItemGroup>
 </Project>

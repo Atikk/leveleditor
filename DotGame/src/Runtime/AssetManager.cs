@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.IO;
 using DotGame.Core.Resources;
@@ -6,7 +6,7 @@ using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 using DotGame.Runtime.Content;
 
-namespace DotGameAvalonia.MonoGameLayer
+namespace Dotgame.Avalonia.MonoGameLayer
 {
     public sealed class AssetManager
     {

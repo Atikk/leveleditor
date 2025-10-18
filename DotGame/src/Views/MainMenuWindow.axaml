@@ -1,7 +1,7 @@
-<Window xmlns="https://github.com/avaloniaui"
+﻿<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        x:Class="DotGameAvalonia.Views.MainMenuWindow"
-        Title="DotGame – Main Menu"
+        x:Class="Dotgame.Avalonia.Views.MainMenuWindow"
+    Title="DotGame - Main Menu"
         Width="600" Height="720"
         WindowStartupLocation="CenterScreen"
         CanResize="False"
@@ -15,7 +15,7 @@
                 BorderThickness="0,0,0,2"
                 Padding="36,32">
             <StackPanel Spacing="8">
-                <TextBlock Text="🎮 DotGame Toolkit"
+                <TextBlock Text="DotGame Toolkit"
                            FontSize="32"
                            FontWeight="ExtraBold"
                            Foreground="#111827" />
@@ -54,8 +54,9 @@
                                 CornerRadius="12"
                                 VerticalAlignment="Center"
                                 Margin="0,0,16,0">
-                            <TextBlock Text="🗺️"
-                                       FontSize="28"
+                            <TextBlock Text="ME"
+                                       FontSize="20"
+                                       FontWeight="Bold"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center" />
                         </Border>
@@ -70,7 +71,7 @@
                                        TextWrapping="Wrap" />
                         </StackPanel>
                         <TextBlock Grid.Column="2"
-                                   Text="→"
+                                   Text=">"
                                    FontSize="24"
                                    Foreground="#9CA3AF"
                                    VerticalAlignment="Center" />
@@ -96,8 +97,9 @@
                                 CornerRadius="12"
                                 VerticalAlignment="Center"
                                 Margin="0,0,16,0">
-                            <TextBlock Text="🎨"
-                                       FontSize="28"
+                            <TextBlock Text="SE"
+                                       FontSize="20"
+                                       FontWeight="Bold"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center" />
                         </Border>
@@ -112,7 +114,7 @@
                                        TextWrapping="Wrap" />
                         </StackPanel>
                         <TextBlock Grid.Column="2"
-                                   Text="→"
+                                   Text=">"
                                    FontSize="24"
                                    Foreground="#9CA3AF"
                                    VerticalAlignment="Center" />
@@ -138,8 +140,9 @@
                                 CornerRadius="12"
                                 VerticalAlignment="Center"
                                 Margin="0,0,16,0">
-                            <TextBlock Text="🎬"
-                                       FontSize="28"
+                            <TextBlock Text="AN"
+                                       FontSize="20"
+                                       FontWeight="Bold"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center" />
                         </Border>
@@ -154,7 +157,7 @@
                                        TextWrapping="Wrap" />
                         </StackPanel>
                         <TextBlock Grid.Column="2"
-                                   Text="→"
+                                   Text=">"
                                    FontSize="24"
                                    Foreground="#9CA3AF"
                                    VerticalAlignment="Center" />
@@ -180,8 +183,9 @@
                                 CornerRadius="12"
                                 VerticalAlignment="Center"
                                 Margin="0,0,16,0">
-                            <TextBlock Text="🎮"
-                                       FontSize="28"
+                            <TextBlock Text="TM"
+                                       FontSize="20"
+                                       FontWeight="Bold"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center" />
                         </Border>
@@ -196,7 +200,7 @@
                                        TextWrapping="Wrap" />
                         </StackPanel>
                         <TextBlock Grid.Column="2"
-                                   Text="→"
+                                   Text=">"
                                    FontSize="24"
                                    Foreground="#9CA3AF"
                                    VerticalAlignment="Center" />
@@ -222,8 +226,9 @@
                                 CornerRadius="12"
                                 VerticalAlignment="Center"
                                 Margin="0,0,16,0">
-                            <TextBlock Text="⚔️"
-                                       FontSize="28"
+                            <TextBlock Text="CC"
+                                       FontSize="20"
+                                       FontWeight="Bold"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center" />
                         </Border>
@@ -238,7 +243,7 @@
                                        TextWrapping="Wrap" />
                         </StackPanel>
                         <TextBlock Grid.Column="2"
-                                   Text="→"
+                                   Text=">"
                                    FontSize="24"
                                    Foreground="#9CA3AF"
                                    VerticalAlignment="Center" />
@@ -253,7 +258,7 @@
                 BorderBrush="#E5E7EB"
                 BorderThickness="0,2,0,0"
                 Padding="36,16">
-            <TextBlock Text="Built with Avalonia UI • DotGame Toolkit v1.0"
+            <TextBlock Text="Built with Avalonia UI - DotGame Toolkit v1.0"
                        FontSize="12"
                        Foreground="#9CA3AF"
                        HorizontalAlignment="Center" />
@@ -261,3 +266,4 @@
     </Grid>
 
 </Window>
+

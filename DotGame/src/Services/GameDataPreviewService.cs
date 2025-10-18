@@ -1,4 +1,4 @@
-using System;using System;
+﻿using System;using System;
 
 using System.Collections.Generic;using System.Collections.Generic;
 
@@ -16,7 +16,7 @@ using DotGame.Runtime.GameData;        sb.Append($"Quest '{quest.Name}' ({quest.
 
 
 
-namespace DotGameAvalonia.Services;        sb.Append(quest.Stages.Count == 1 ? string.Empty : "s");
+namespace Dotgame.Avalonia.Services;        sb.Append(quest.Stages.Count == 1 ? string.Empty : "s");
 
 
 
@@ -452,7 +452,7 @@ public sealed class GameDataPreviewService        if (parts.Length == 0)        
 
 
 
-    private bool TryDescribeQuest(string questId, out string description)            onCompleted?.Invoke(report);        return true;        sb.Append($"Quest '{quest.Name}' ({quest.Id}) – {quest.Stages.Count} stage");
+    private bool TryDescribeQuest(string questId, out string description)            onCompleted?.Invoke(report);        return true;        sb.Append($"Quest '{quest.Name}' ({quest.Id}) â€“ {quest.Stages.Count} stage");
 
     {
 
@@ -540,7 +540,7 @@ public sealed class GameDataPreviewService        if (parts.Length == 0)        
 
         {
 
-            var firstStep = cutscene.Steps[0];                {    {                sb.Append($" – {Truncate(firstStage.Narrative, 80)}");
+            var firstStep = cutscene.Steps[0];                {    {                sb.Append($" â€“ {Truncate(firstStage.Narrative, 80)}");
 
             sb.Append($". First step: {firstStep.Type} ({FormatDuration(firstStep.Duration)})");
 
@@ -621,7 +621,7 @@ public sealed class GameDataPreviewService        if (parts.Length == 0)        
 
         var sb = new StringBuilder();
 
-            if (!string.IsNullOrWhiteSpace(firstStage.Narrative))        sb.Append($"Cutscene '{cutscene.Id}' – {cutscene.Steps.Count} step");
+            if (!string.IsNullOrWhiteSpace(firstStage.Narrative))        sb.Append($"Cutscene '{cutscene.Id}' â€“ {cutscene.Steps.Count} step");
 
             {        sb.Append(cutscene.Steps.Count == 1 ? string.Empty : "s");
 
@@ -657,7 +657,7 @@ public sealed class GameDataPreviewService        if (parts.Length == 0)        
 
         var sb = new StringBuilder();
 
-        sb.Append($"Cutscene '{cutscene.Id}'  {cutscene.Steps.Count} step");        return text[..Math.Max(0, maxLength - 1)] + "…";
+        sb.Append($"Cutscene '{cutscene.Id}'  {cutscene.Steps.Count} step");        return text[..Math.Max(0, maxLength - 1)] + "â€¦";
 
         sb.Append(cutscene.Steps.Count == 1 ? string.Empty : "s");    }
 
@@ -703,7 +703,7 @@ public sealed class GameDataPreviewService        if (parts.Length == 0)        
 
     {                .OrderBy(g => g.Id, StringComparer.OrdinalIgnoreCase)
 
-        if (duration == TimeSpan.Zero)                .Select(g => new GameDataEntrySummary(g.Id, $"{g.Id} – {g.Nodes.Count} node{(g.Nodes.Count == 1 ? string.Empty : "s")}"))
+        if (duration == TimeSpan.Zero)                .Select(g => new GameDataEntrySummary(g.Id, $"{g.Id} â€“ {g.Nodes.Count} node{(g.Nodes.Count == 1 ? string.Empty : "s")}"))
 
             return "instant";                .ToList();
 
@@ -725,7 +725,7 @@ public sealed class GameDataPreviewService        if (parts.Length == 0)        
 
     }                .OrderBy(q => q.Id, StringComparer.OrdinalIgnoreCase)
 
-                .Select(q => new GameDataEntrySummary(q.Id, $"{q.Name} ({q.Id}) – {q.Stages.Count} stage{(q.Stages.Count == 1 ? string.Empty : "s")}"))
+                .Select(q => new GameDataEntrySummary(q.Id, $"{q.Name} ({q.Id}) â€“ {q.Stages.Count} stage{(q.Stages.Count == 1 ? string.Empty : "s")}"))
 
     public IReadOnlyList<GameDataEntrySummary> GetDialogueSummaries()                .ToList();
 
@@ -747,7 +747,7 @@ public sealed class GameDataPreviewService        if (parts.Length == 0)        
 
     }                .OrderBy(c => c.Id, StringComparer.OrdinalIgnoreCase)
 
-                .Select(c => new GameDataEntrySummary(c.Id, $"{c.Id} – {c.Steps.Count} step{(c.Steps.Count == 1 ? string.Empty : "s")}"))
+                .Select(c => new GameDataEntrySummary(c.Id, $"{c.Id} â€“ {c.Steps.Count} step{(c.Steps.Count == 1 ? string.Empty : "s")}"))
 
     public IReadOnlyList<GameDataEntrySummary> GetQuestSummaries()                .ToList();
 
@@ -872,3 +872,4 @@ public sealed class GameDataPreviewService        if (parts.Length == 0)        
         }
     }
 }
+

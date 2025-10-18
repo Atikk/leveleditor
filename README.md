@@ -1,8 +1,8 @@
-# DotGame - Tile-Based Game Editor
+﻿# DotGame - Tile-Based Game Editor
 
 A C# desktop application for creating and playing tile-based games with a visual map editor.
 
-## ✅ Cross-Platform Success!
+## âœ… Cross-Platform Success!
 
 This application was originally designed for **Windows** using Windows Forms. The Windows Forms version is preserved in `src/DotGameCSharp/` and works perfectly on Windows systems.
 
@@ -10,13 +10,13 @@ This application was originally designed for **Windows** using Windows Forms. Th
 
 ### Current Status in Replit
 
-✅ **What Works:**
+âœ… **What Works:**
 - Avalonia UI demo app running successfully on Linux
 - VNC/noVNC environment configured (accessible via webview)
 - Cross-platform .NET runtime working perfectly
 - All required Linux dependencies installed
 
-📂 **Demo Location:** `avalonia-demo/DotGameAvalonia/`
+ðŸ“‚ **Demo Location:** `avalonia-demo/Dotgame.Avalonia/`
 
 ### Running This Project
 
@@ -44,7 +44,7 @@ If you prefer a small helper script to build and run the Avalonia demo on Window
 
 Usage notes:
 - Requires the .NET 8 SDK (dotnet) on PATH.
-- By default the script builds and runs `DotGame\DotGameAvalonia.csproj` in `Debug` configuration.
+- By default the script builds and runs `DotGame\Dotgame.Avalonia.csproj` in `Debug` configuration.
 - Run `Get-Help .\run-windows.ps1 -Full` for available parameters (configuration, skip build, run detached, etc.).
 
 
@@ -72,13 +72,13 @@ The original game logic (`Map.cs`, `Character.cs`, `GameForm.cs`) can be ported 
 
 ```
 src/DotGameCSharp/
-├── Program.cs              # Application entry point
-├── MainMenuForm.cs         # Main menu UI
-├── EditorForm.cs           # Tile map editor
-├── GameForm.cs             # Game player
-├── Map.cs                  # Map data and serialization
-├── Character.cs            # Character system
-└── DotGameCSharp.csproj    # Project configuration
+â”œâ”€â”€ Program.cs              # Application entry point
+â”œâ”€â”€ MainMenuForm.cs         # Main menu UI
+â”œâ”€â”€ EditorForm.cs           # Tile map editor
+â”œâ”€â”€ GameForm.cs             # Game player
+â”œâ”€â”€ Map.cs                  # Map data and serialization
+â”œâ”€â”€ Character.cs            # Character system
+â””â”€â”€ DotGameCSharp.csproj    # Project configuration
 ```
 
 ## File Format
@@ -118,7 +118,7 @@ Maps are saved as JSON files with embedded base64-encoded PNG images:
 - **Language**: C# 11
 - **Graphics**: System.Drawing
 
-### Cross-Platform Avalonia Demo (`avalonia-demo/DotGameAvalonia/`)
+### Cross-Platform Avalonia Demo (`avalonia-demo/Dotgame.Avalonia/`)
 - **Framework**: .NET 8.0
 - **UI**: Avalonia UI (cross-platform)
 - **Language**: C# 11
@@ -134,7 +134,7 @@ The Avalonia framework is already working! To create the full game in Avalonia:
    - Game mechanics are framework-independent
 
 2. **Adapt UI Components**
-   - Convert Windows Forms controls → Avalonia controls
+   - Convert Windows Forms controls â†’ Avalonia controls
    - Migrate painting/rendering logic to Avalonia's rendering system
    - Update event handlers for Avalonia's event model
 
@@ -150,3 +150,4 @@ This project was originally created as LINQPad scripts (.linq files) and has bee
 ## License
 
 The project structure and code organization was set up by Replit Agent. The original game logic remains as imported from the source repository.
+

@@ -1,6 +1,6 @@
-<Window xmlns="https://github.com/avaloniaui"
+﻿<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        x:Class="DotGameAvalonia.Views.AnimationEditorWindow"
+        x:Class="Dotgame.Avalonia.Views.AnimationEditorWindow"
         Title="Animation Builder"
         Width="1200" Height="800"
         WindowStartupLocation="CenterScreen"
@@ -15,9 +15,6 @@
             <StackPanel Spacing="14">
                 <!-- Title Row -->
                 <StackPanel Orientation="Horizontal" Spacing="12">
-                    <TextBlock Text="🎬"
-                               FontSize="24"
-                               VerticalAlignment="Center" />
                     <TextBlock Text="Animation Builder"
                                FontSize="20"
                                FontWeight="Bold"
@@ -32,8 +29,8 @@
                         CornerRadius="10"
                         Padding="16,12">
                     <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                        <Button Name="BtnLoadSheet" 
-                                Content="📁 Load Sprite Sheet" 
+            <Button Name="BtnLoadSheet" 
+                Content="Load Sprite Sheet" 
                                 Width="180"
                                 Classes="primary" />
                         
@@ -68,9 +65,9 @@
                         
                         <Border Width="2" Height="32" Background="#E5E7EB" Margin="8,0,4,0" />
                         
-                        <Button Name="BtnPlay" Content="▶️ Play" Width="100" Classes="success" />
-                        <Button Name="BtnStop" Content="⏹️ Stop" Width="100" />
-                        <Button Name="BtnSave" Content="💾 Save" Width="140" Classes="primary" />
+                        <Button Name="BtnPlay" Content="Play" Width="100" Classes="success" />
+                        <Button Name="BtnStop" Content="Stop" Width="100" />
+                        <Button Name="BtnSave" Content="Save" Width="140" Classes="primary" />
                     </StackPanel>
                 </Border>
             </StackPanel>
@@ -191,3 +188,4 @@
         </Grid>
     </DockPanel>
 </Window>
+

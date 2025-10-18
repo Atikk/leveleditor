@@ -1,17 +1,17 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Input;
-using Avalonia.Media;
-using Avalonia.Media.Imaging;
-using Avalonia.Threading;
-using DotGameAvalonia.Models;
+using global::Avalonia;
+using global::Avalonia.Controls;
+using global::Avalonia.Input;
+using global::Avalonia.Media;
+using global::Avalonia.Media.Imaging;
+using global::Avalonia.Threading;
+using Dotgame.Avalonia.Models;
 using SkiaSharp;
 
-namespace DotGameAvalonia.Views
+namespace Dotgame.Avalonia.Views
 {
     public partial class GameWindow : Window
     {
@@ -52,6 +52,7 @@ namespace DotGameAvalonia.Views
             InitPlayer(playerSprite, charClass, charName);
             FitWindowToMap();
             RenderGame();
+            ConfigureGameLoop();
         }
 
         private void AttachEvents()
@@ -168,6 +169,15 @@ namespace DotGameAvalonia.Views
             CheckCombatTriggers();
             UpdateUI();
             RenderGame();
+        }
+
+        private void ConfigureGameLoop()
+        {
+            // Keep the lightweight game simulation advancing while the window is open.
+            timer.Interval = TimeSpan.FromMilliseconds(1000.0 / 60.0);
+            timer.Tick -= GameLoop;
+            timer.Tick += GameLoop;
+            timer.Start();
         }
 
         private void CheckCombatTriggers()
@@ -332,8 +342,15 @@ namespace DotGameAvalonia.Views
 
         protected override void OnClosed(EventArgs e)
         {
+            if (timer != null)
+            {
+                timer.Tick -= GameLoop;
+                timer.Stop();
+            }
+
             base.OnClosed(e);
-            timer?.Stop();
         }
     }
 }
+
+

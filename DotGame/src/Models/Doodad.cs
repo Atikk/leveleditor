@@ -1,7 +1,7 @@
-using Avalonia.Media;
-using Avalonia.Media.Imaging;
+﻿using global::Avalonia.Media;
+using global::Avalonia.Media.Imaging;
 
-namespace DotGameAvalonia.Models
+namespace Dotgame.Avalonia.Models
 {
     public class Doodad
     {
@@ -26,3 +26,4 @@ namespace DotGameAvalonia.Models
         public override string ToString() => $"{Type} @ {TileX},{TileY}";
     }
 }
+

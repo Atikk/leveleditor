@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
@@ -6,18 +6,18 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
-using Avalonia.Input;
-using Avalonia.Interactivity;
-using Avalonia.Layout;
-using Avalonia.Media;
-using Avalonia.Media.Imaging;
-using Avalonia.Platform.Storage;
-using Avalonia.Threading;
+using global::Avalonia;
+using global::Avalonia.Controls;
+using global::Avalonia.Controls.Primitives;
+using global::Avalonia.Input;
+using global::Avalonia.Interactivity;
+using global::Avalonia.Layout;
+using global::Avalonia.Media;
+using global::Avalonia.Media.Imaging;
+using global::Avalonia.Platform.Storage;
+using global::Avalonia.Threading;
 
-namespace DotGameAvalonia.Views
+namespace Dotgame.Avalonia.Views
 {
     public partial class AnimationEditorWindow : Window
     {
@@ -564,7 +564,7 @@ namespace DotGameAvalonia.Views
             var size = spriteSheet.PixelSize;
             int columns = frameWidth == 0 ? 0 : size.Width / frameWidth;
             int rows = frameHeight == 0 ? 0 : size.Height / frameHeight;
-            spriteInfoText.Text = $"{Path.GetFileName(spriteSheetPath)} – {size.Width}x{size.Height}px | Frames: {columns * rows} ({columns} cols × {rows} rows)";
+            spriteInfoText.Text = $"{Path.GetFileName(spriteSheetPath)} â€“ {size.Width}x{size.Height}px | Frames: {columns * rows} ({columns} cols Ã— {rows} rows)";
         }
 
         private void UpdateActionStates()
@@ -637,3 +637,5 @@ namespace DotGameAvalonia.Views
         }
     }
 }
+
+

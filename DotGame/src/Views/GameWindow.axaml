@@ -1,7 +1,7 @@
-<Window xmlns="https://github.com/avaloniaui"
+﻿<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        x:Class="DotGameAvalonia.Views.GameWindow"
-        Title="DotGame – Play Test"
+        x:Class="Dotgame.Avalonia.Views.GameWindow"
+    Title="DotGame - Play Test"
         Width="900" Height="700"
         WindowStartupLocation="CenterScreen"
         CanResize="True"
@@ -33,7 +33,7 @@
             <StackPanel Spacing="18">
                 <!-- Combat Header -->
                 <TextBlock Name="TxtCombatMessage" 
-                           Text="⚔️ Battle!" 
+                           Text="Battle!" 
                            Foreground="#111827" 
                            FontSize="24" 
                            FontWeight="ExtraBold" 
@@ -120,19 +120,13 @@
                             Width="160" 
                             Height="52"
                             Classes="danger">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="⚔️" FontSize="20" VerticalAlignment="Center" />
-                            <TextBlock Text="Attack" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
-                        </StackPanel>
+                        <TextBlock Text="Attack" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" />
                     </Button>
                     <Button Name="BtnDefend" 
                             Width="160" 
                             Height="52"
                             Classes="primary">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="🛡️" FontSize="20" VerticalAlignment="Center" />
-                            <TextBlock Text="Defend" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
-                        </StackPanel>
+                        <TextBlock Text="Defend" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" />
                     </Button>
                 </StackPanel>
             </StackPanel>
@@ -154,7 +148,7 @@
                                   OffsetY="4" />
             </Border.Effect>
             <StackPanel Spacing="6">
-                <TextBlock Text="🎮 Player Stats"
+                <TextBlock Text="Player Stats"
                            FontSize="13"
                            FontWeight="Bold"
                            Foreground="#6B7280" />
@@ -181,7 +175,7 @@
                                   OffsetY="4" />
             </Border.Effect>
             <StackPanel Spacing="4">
-                <TextBlock Text="⌨️ Controls"
+                <TextBlock Text="Controls"
                            FontSize="12"
                            FontWeight="Bold"
                            Foreground="#6B7280" />
@@ -196,3 +190,4 @@
     </Grid>
     
 </Window>
+

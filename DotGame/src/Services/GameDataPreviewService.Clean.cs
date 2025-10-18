@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using DotGame.Core.Resources;
 using DotGame.Runtime.GameData;
 
-namespace DotGameAvalonia.Services;
+namespace Dotgame.Avalonia.Services;
 
 public sealed class GameDataPreviewService
 {
@@ -308,3 +308,4 @@ public sealed class GameDataPreviewService
 
     public sealed record GameDataEntrySummary(string Id, string Summary);
 }
+

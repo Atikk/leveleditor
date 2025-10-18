@@ -1,9 +1,9 @@
-<#
+﻿<#
 .SYNOPSIS
   Build and run the Avalonia demo on Windows (helper script).
 
 .DESCRIPTION
-  This script builds and runs the `DotGame\DotGameAvalonia.csproj` project
+  This script builds and runs the `DotGame\Dotgame.Avalonia.csproj` project
   using the `dotnet` CLI. It performs a small set of sanity checks and
   exposes a few parameters for convenience.
 
@@ -36,7 +36,7 @@ function Write-Err($msg)  { Write-Host "[ERROR] $msg" -ForegroundColor Red }
 
 Set-StrictMode -Version Latest
 
-$projectPath = Join-Path -Path $PSScriptRoot -ChildPath 'DotGame\DotGameAvalonia.csproj'
+$projectPath = Join-Path -Path $PSScriptRoot -ChildPath 'DotGame\Dotgame.Avalonia.csproj'
 
 Write-Info "Script root: $PSScriptRoot"
 
@@ -71,3 +71,4 @@ if ($Detach) {
     & dotnet run --project "$projectPath" -c $Configuration
     exit $LASTEXITCODE
 }
+

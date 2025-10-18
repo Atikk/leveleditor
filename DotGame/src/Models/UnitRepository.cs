@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
-using DotGameAvalonia.Models;
+using Dotgame.Avalonia.Models;
 
-namespace DotGameAvalonia.Models
+namespace Dotgame.Avalonia.Models
 {
     public static class UnitRepository
     {

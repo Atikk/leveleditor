@@ -1,7 +1,7 @@
-﻿using Avalonia;
+﻿using global::Avalonia;
 using System;
 
-namespace DotGameAvalonia;
+namespace Dotgame.Avalonia;
 
 class Program
 {
@@ -19,3 +19,5 @@ class Program
             .WithInterFont()
             .LogToTrace();
 }
+
+

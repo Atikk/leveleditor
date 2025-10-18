@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
-namespace DotGameAvalonia.Models
+namespace Dotgame.Avalonia.Models
 {
     public class AnimationController
     {

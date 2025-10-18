@@ -1,4 +1,4 @@
-namespace DotGameAvalonia.Engine.Components
+﻿namespace Dotgame.Avalonia.Engine.Components
 {
     /// <summary>
     /// Marker component designating the owning entity as player-controlled.
@@ -7,3 +7,4 @@ namespace DotGameAvalonia.Engine.Components
     {
     }
 }
+

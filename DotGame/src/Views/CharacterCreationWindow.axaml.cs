@@ -1,16 +1,16 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Collections.Generic;
-using Avalonia.Controls;
-using Avalonia.Interactivity;
-using Avalonia.Media.Imaging;
-using Avalonia.Media;
-using Avalonia;
-using DotGameAvalonia.Models;
-using DotGameAvalonia.Assets;
-using Avalonia.Platform.Storage;
+using global::Avalonia.Controls;
+using global::Avalonia.Interactivity;
+using global::Avalonia.Media.Imaging;
+using global::Avalonia.Media;
+using global::Avalonia;
+using Dotgame.Avalonia.Models;
+using Dotgame.Avalonia.Assets;
+using global::Avalonia.Platform.Storage;
 
-namespace DotGameAvalonia.Views
+namespace Dotgame.Avalonia.Views
 {
     public partial class CharacterCreationWindow : Window
     {
@@ -110,7 +110,7 @@ namespace DotGameAvalonia.Views
 
                 try
                 {
-                    SelectedSprite = new Avalonia.Media.Imaging.Bitmap(spritePath);
+                    SelectedSprite = new Bitmap(spritePath);
                     if (imgPreview != null)
                         imgPreview.Source = SelectedSprite;
                 }
@@ -146,9 +146,9 @@ namespace DotGameAvalonia.Views
                 {
                     lblClassDesc.Text = SelectedClass switch
                     {
-                        CharacterClass.Warrior => "⚔️ A strong fighter with high HP and Defense. Excels in close combat.",
-                        CharacterClass.Mage => "🔮 A powerful spellcaster with high Attack but low Defense. Deals massive damage.",
-                        CharacterClass.Thief => "🗡️ A balanced rogue with moderate stats. Quick and versatile in battle.",
+                        CharacterClass.Warrior => "âš”ï¸ A strong fighter with high HP and Defense. Excels in close combat.",
+                        CharacterClass.Mage => "ðŸ”® A powerful spellcaster with high Attack but low Defense. Deals massive damage.",
+                        CharacterClass.Thief => "ðŸ—¡ï¸ A balanced rogue with moderate stats. Quick and versatile in battle.",
                         _ => ""
                     };
                 }
@@ -231,3 +231,5 @@ namespace DotGameAvalonia.Views
         }
     }
 }
+
+

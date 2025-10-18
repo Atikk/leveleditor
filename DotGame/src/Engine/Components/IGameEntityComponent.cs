@@ -1,7 +1,7 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace DotGameAvalonia.Engine.Components
+namespace Dotgame.Avalonia.Engine.Components
 {
     /// <summary>
     /// Contract implemented by all runtime components that can be attached to an entity.
@@ -21,3 +21,4 @@ namespace DotGameAvalonia.Engine.Components
         void Draw(GameTime gameTime, SpriteBatch spriteBatch);
     }
 }
+

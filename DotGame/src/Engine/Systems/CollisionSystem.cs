@@ -1,8 +1,8 @@
-using System.Collections.Generic;
-using DotGameAvalonia.Engine.Components;
+﻿using System.Collections.Generic;
+using Dotgame.Avalonia.Engine.Components;
 using Microsoft.Xna.Framework;
 
-namespace DotGameAvalonia.Engine.Systems
+namespace Dotgame.Avalonia.Engine.Systems
 {
     /// <summary>
     /// Performs broad-phase AABB collision checks and dispatches collision events.
@@ -69,3 +69,4 @@ namespace DotGameAvalonia.Engine.Systems
         }
     }
 }
+

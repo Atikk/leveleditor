@@ -1,171 +1,250 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        x:Class="DotGameAvalonia.Views.SpriteEditorWindow"
+﻿<Window xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:views="clr-namespace:Dotgame.Avalonia.Views"
+        x:Class="Dotgame.Avalonia.Views.SpriteEditorWindow"
         Title="DotGame Sprite Editor"
-        Width="1100" Height="750"
+        Width="1320" Height="820"
         WindowStartupLocation="CenterScreen"
         Background="#F3F4F6">
-    
+
+    <Window.Styles>
+        <Style Selector="WrapPanel.panel-toolbar > Control">
+            <Setter Property="Margin" Value="0,0,8,8" />
+        </Style>
+    </Window.Styles>
+
     <DockPanel>
-        <!-- Modern Toolbar -->
-        <Border DockPanel.Dock="Top" 
-                Background="White" 
+        <!-- Header + Toolbars -->
+        <Border DockPanel.Dock="Top"
+                Background="White"
                 BorderBrush="#E5E7EB"
-                BorderThickness="0,0,0,2"
-                Padding="20,16">
+                BorderThickness="0,0,0,1"
+                Padding="18,14">
             <StackPanel Spacing="14">
-                <!-- Title Row -->
-                <StackPanel Orientation="Horizontal" Spacing="12">
-                    <TextBlock Text="🎨"
-                               FontSize="24"
-                               VerticalAlignment="Center" />
-                    <TextBlock Text="Sprite Editor"
-                               FontSize="20"
-                               FontWeight="Bold"
-                               Foreground="#111827"
-                               VerticalAlignment="Center" />
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                        <StackPanel>
+                            <TextBlock Text="Sprite Editor" FontSize="20" FontWeight="Bold" Foreground="#111827" />
+                            <TextBlock Text="Pixel-perfect painting - Animation-ready exports" FontSize="12" Foreground="#6B7280" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <Button Name="BtnImportSpriteSheet" Content="Import Sheet" MinWidth="130" />
+                        <Button Name="BtnExportSpriteSheet" Content="Export Sheet" MinWidth="130" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <Button Name="BtnLoadSprite" Content="Open" MinWidth="90" />
+                        <Button Name="BtnSaveSprite" Content="Save" MinWidth="90" Classes="success" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <Button Name="BtnNewCanvas" Content="New Canvas" MinWidth="110" Classes="primary" />
+                        <Button Name="BtnClear" Content="Clear" MinWidth="90" Classes="danger" />
+                    </StackPanel>
+                </Grid>
+
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <WrapPanel Classes="panel-toolbar" Name="ToolBarPanel">
+                        <ToggleButton Name="ToolPencil" Content="Pencil" IsChecked="True" MinWidth="90" />
+                        <ToggleButton Name="ToolEraser" Content="Eraser" MinWidth="90" />
+                        <ToggleButton Name="ToolFill" Content="Fill" MinWidth="90" />
+                        <ToggleButton Name="ToolLine" Content="Line" MinWidth="90" />
+                        <ToggleButton Name="ToolRectangle" Content="Rectangle" MinWidth="110" />
+                        <ToggleButton Name="ToolEyedropper" Content="Eyedropper" MinWidth="120" />
+
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <TextBlock Text="Brush" VerticalAlignment="Center" Foreground="#4B5563" />
+                            <NumericUpDown Name="NumBrushSize" Minimum="1" Maximum="16" Value="1" Width="70" />
+                        </StackPanel>
+
+                        <CheckBox Name="ChkShowGrid" Content="Show Grid" IsChecked="True" VerticalAlignment="Center" />
+                        <CheckBox Name="ChkOnionSkin" Content="Onion Skin" VerticalAlignment="Center" />
+                        <CheckBox Name="ChkMirrorX" Content="Mirror X" VerticalAlignment="Center" />
+                        <CheckBox Name="ChkMirrorY" Content="Mirror Y" VerticalAlignment="Center" />
+
+                        <Button Name="BtnFlipHorizontal" Content="Flip H" MinWidth="90" />
+                        <Button Name="BtnFlipVertical" Content="Flip V" MinWidth="90" />
+                    </WrapPanel>
+                </ScrollViewer>
+
+                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,14,0">
+                        <TextBlock Text="Canvas" FontWeight="SemiBold" Foreground="#374151" />
+                        <TextBlock Text="W" Foreground="#6B7280" VerticalAlignment="Center" />
+                        <NumericUpDown Name="NumCanvasWidth" Minimum="1" Maximum="512" Value="64" Width="80" />
+                        <TextBlock Text="H" Foreground="#6B7280" VerticalAlignment="Center" />
+                        <NumericUpDown Name="NumCanvasHeight" Minimum="1" Maximum="512" Value="64" Width="80" />
+                        <TextBlock Text="Zoom" Foreground="#6B7280" VerticalAlignment="Center" />
+                        <NumericUpDown Name="NumZoom" Minimum="1" Maximum="32" Value="12" Width="80" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="0,0,14,0">
+                        <TextBlock Text="Frame Size" FontWeight="SemiBold" Foreground="#374151" />
+                        <TextBlock Text="W" Foreground="#6B7280" VerticalAlignment="Center" />
+                        <NumericUpDown Name="NumFrameWidth" Minimum="1" Maximum="512" Value="32" Width="80" />
+                        <TextBlock Text="H" Foreground="#6B7280" VerticalAlignment="Center" />
+                        <NumericUpDown Name="NumFrameHeight" Minimum="1" Maximum="512" Value="32" Width="80" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="0,0,14,0">
+                        <TextBlock Text="Preview" FontWeight="SemiBold" Foreground="#374151" />
+                        <TextBlock Text="FPS" Foreground="#6B7280" VerticalAlignment="Center" />
+                        <NumericUpDown Name="NumFrameDuration" Minimum="20" Maximum="1000" Value="120" Width="80" />
+                        <TextBlock Text="ms/frame" Foreground="#6B7280" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" Margin="0,0,14,0">
+                        <Button Name="BtnPlayAnimation" Content="Play" MinWidth="80" />
+                        <Button Name="BtnStopAnimation" Content="Stop" MinWidth="80" IsEnabled="False" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="6" Margin="0,0,14,0">
+                        <Button Name="BtnAddFrame" Content="Add Frame" MinWidth="90" Classes="primary" />
+                        <Button Name="BtnDuplicateFrame" Content="Duplicate" MinWidth="110" />
+                        <Button Name="BtnDeleteFrame" Content="Delete" MinWidth="90" Classes="danger" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="6">
+                        <Button Name="BtnMoveFrameUp" Content="Move Up" Width="70" />
+                        <Button Name="BtnMoveFrameDown" Content="Move Down" Width="80" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Color Palette -->
+        <Border DockPanel.Dock="Left"
+                BorderBrush="#E5E7EB"
+                BorderThickness="0,0,1,0"
+                Width="260"
+                Background="White"
+                Padding="16">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Palette" FontWeight="Bold" FontSize="16" Foreground="#111827" />
+
+                <Border Name="SelectedColorDisplay"
+                        Height="70"
+                        BorderBrush="#D1D5DB"
+                        BorderThickness="2"
+                        Background="Black"
+                        CornerRadius="12">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="12" Color="#000000" Opacity="0.1" OffsetY="3" />
+                    </Border.Effect>
+                </Border>
+
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Name="BtnAddPaletteColor" Content="Add" MinWidth="70" />
+                    <Button Name="BtnRemovePaletteColor" Content="Remove" MinWidth="90" />
+                    <Button Name="BtnResetPalette" Content="Reset" MinWidth="70" />
                 </StackPanel>
-                
-                <!-- Canvas Controls Row -->
+
                 <Border Background="#F9FAFB"
                         BorderBrush="#E5E7EB"
                         BorderThickness="1"
                         CornerRadius="10"
-                        Padding="16,12">
-                    <StackPanel Spacing="12">
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <TextBlock Text="Canvas Size:"
-                                       FontWeight="SemiBold"
-                                       FontSize="13"
-                                       Foreground="#374151"
-                                       VerticalAlignment="Center" />
-                            <TextBlock Text="Width:" VerticalAlignment="Center" Foreground="#6B7280" />
-                            <NumericUpDown Name="NumCanvasWidth" Minimum="1" Maximum="512" Value="64" Width="80" />
-                            <TextBlock Text="Height:" VerticalAlignment="Center" Foreground="#6B7280" Margin="8,0,0,0" />
-                            <NumericUpDown Name="NumCanvasHeight" Minimum="1" Maximum="512" Value="64" Width="80" />
-                            <Button Name="BtnNewCanvas" Content="🆕 New Canvas" Margin="12,0,0,0" MinWidth="130" Classes="primary" />
-                            <TextBlock Text="Zoom:" VerticalAlignment="Center" Foreground="#6B7280" Margin="20,0,0,0" />
-                            <NumericUpDown Name="NumZoom" Minimum="1" Maximum="20" Value="8" Width="70" />
-                        </StackPanel>
-                        
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <TextBlock Text="Frame Settings:"
-                                       FontWeight="SemiBold"
-                                       FontSize="13"
-                                       Foreground="#374151"
-                                       VerticalAlignment="Center" />
-                            <TextBlock Text="Width:" VerticalAlignment="Center" Foreground="#6B7280" />
-                            <NumericUpDown Name="NumFrameWidth" Minimum="1" Maximum="512" Value="32" Width="80" />
-                            <TextBlock Text="Height:" VerticalAlignment="Center" Foreground="#6B7280" Margin="8,0,0,0" />
-                            <NumericUpDown Name="NumFrameHeight" Minimum="1" Maximum="512" Value="32" Width="80" />
-                            <TextBlock Text="Frame:" VerticalAlignment="Center" Foreground="#6B7280" Margin="20,0,0,0" />
-                            <NumericUpDown Name="NumCurrentFrame" Minimum="0" Maximum="99" Value="0" Width="70" />
-                            <Button Name="BtnPrevFrame" Content="◀" Width="40" Margin="4,0" />
-                            <Button Name="BtnNextFrame" Content="▶" Width="40" />
-                        </StackPanel>
-                        
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <Button Name="BtnClear" Content="🗑️ Clear Canvas" MinWidth="130" Classes="danger" />
-                            <Button Name="BtnLoadSprite" Content="📁 Load Sprite" MinWidth="120" />
-                            <Button Name="BtnSaveSprite" Content="💾 Save Sprite" MinWidth="120" Classes="success" />
-                            <CheckBox Name="ChkShowGrid" 
-                                      Content="Show Grid" 
-                                      Margin="20,0,0,0" 
-                                      IsChecked="True"
-                                      VerticalAlignment="Center"
-                                      FontWeight="Medium" />
-                            <TextBlock Text="💡 Left-click to draw, right-click to erase" 
-                                      VerticalAlignment="Center" 
-                                      Margin="24,0,0,0" 
-                                      Foreground="#9CA3AF"
-                                      FontStyle="Italic"
-                                      FontSize="12" />
-                        </StackPanel>
-                    </StackPanel>
+                        Padding="12">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Height="240">
+                        <WrapPanel Name="ColorPalette" Orientation="Horizontal" />
+                    </ScrollViewer>
                 </Border>
+
+                <TextBlock Text="Custom Color" FontWeight="SemiBold" Foreground="#374151" />
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto">
+                    <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+                        <TextBlock Text="R" Width="16" Foreground="#6B7280" />
+                        <NumericUpDown Name="NumRed" Minimum="0" Maximum="255" Value="0" Width="120" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+                        <TextBlock Text="G" Width="16" Foreground="#6B7280" />
+                        <NumericUpDown Name="NumGreen" Minimum="0" Maximum="255" Value="0" Width="120" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+                        <TextBlock Text="B" Width="16" Foreground="#6B7280" />
+                        <NumericUpDown Name="NumBlue" Minimum="0" Maximum="255" Value="0" Width="120" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="A" Width="16" Foreground="#6B7280" />
+                        <NumericUpDown Name="NumAlpha" Minimum="0" Maximum="255" Value="255" Width="120" />
+                    </StackPanel>
+                </Grid>
             </StackPanel>
         </Border>
-        
-        <!-- Color Palette (Left Side) -->
-        <Border DockPanel.Dock="Left" 
-                BorderBrush="#E5E7EB" 
-                BorderThickness="0,0,1,0" 
-                Width="220" 
+
+        <!-- Timeline & Preview -->
+        <Border DockPanel.Dock="Right"
+                BorderBrush="#E5E7EB"
+                BorderThickness="1,0,0,0"
+                Width="320"
                 Background="White"
                 Padding="16">
-            <StackPanel Spacing="12">
-                <TextBlock Text="🎨 Color Palette" 
-                           FontWeight="Bold"
-                           FontSize="15"
-                           Foreground="#111827" />
-                
-                <Border Name="SelectedColorDisplay" 
-                        Height="60" 
-                        Background="Black" 
-                        BorderBrush="#D1D5DB" 
-                        BorderThickness="2"
-                        CornerRadius="10">
-                    <Border.Effect>
-                        <DropShadowEffect BlurRadius="10" 
-                                          Color="#000000" 
-                                          Opacity="0.1"
-                                          OffsetY="2" />
-                    </Border.Effect>
+            <StackPanel Spacing="14">
+                <TextBlock Text="Frames" FontWeight="Bold" FontSize="16" Foreground="#111827" />
+                <ListBox Name="FrameTimeline"
+                         Height="260"
+                         Background="#F9FAFB"
+                         BorderThickness="0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         SelectionMode="Single">
+                    <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                            <Setter Property="Margin" Value="4" />
+                            <Setter Property="Padding" Value="0" />
+                        </Style>
+                    </ListBox.Styles>
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="views:SpriteFrameTimelineItem">
+                            <Border CornerRadius="10"
+                                    Background="#1F2937"
+                                    Padding="6"
+                                    Width="118">
+                                <StackPanel Spacing="6">
+                                    <Border Background="#111827" CornerRadius="8" Padding="4">
+                                        <Image Source="{Binding Preview}"
+                                               Stretch="Uniform"
+                                               Width="100"
+                                               Height="100" />
+                                    </Border>
+                                    <TextBlock Text="{Binding Label}"
+                                               Foreground="#E5E7EB"
+                                               FontSize="12"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <TextBlock Text="Animation Preview" FontWeight="SemiBold" Foreground="#374151" />
+                <Border Background="#111827" CornerRadius="12" Padding="10">
+                    <Image Name="AnimationPreview" Stretch="Uniform" Height="180" Width="260" />
                 </Border>
-                
-                <Border Background="#F9FAFB"
-                        BorderBrush="#E5E7EB"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Padding="10">
-                    <WrapPanel Name="ColorPalette" Orientation="Horizontal" />
-                </Border>
-                
-                <TextBlock Text="Custom Color" 
-                           FontWeight="SemiBold"
-                           FontSize="13"
-                           Foreground="#374151"
-                           Margin="0,8,0,0" />
-                
-                <Border Background="#F9FAFB"
-                        BorderBrush="#E5E7EB"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Padding="12">
-                    <StackPanel Spacing="10">
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Red (R)" FontSize="12" Foreground="#6B7280" FontWeight="Medium" />
-                            <NumericUpDown Name="NumRed" Minimum="0" Maximum="255" Value="0" />
-                        </StackPanel>
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Green (G)" FontSize="12" Foreground="#6B7280" FontWeight="Medium" />
-                            <NumericUpDown Name="NumGreen" Minimum="0" Maximum="255" Value="0" />
-                        </StackPanel>
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Blue (B)" FontSize="12" Foreground="#6B7280" FontWeight="Medium" />
-                            <NumericUpDown Name="NumBlue" Minimum="0" Maximum="255" Value="0" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
+
+                <TextBlock Text="Status" FontWeight="SemiBold" Foreground="#374151" />
+                <TextBlock Name="StatusText" Text="Ready." Foreground="#6B7280" TextWrapping="Wrap" />
             </StackPanel>
         </Border>
-        
-        <!-- Pixel Canvas (Center) -->
-        <Border Background="#E5E7EB" Padding="16">
-            <Border BorderBrush="#D1D5DB" 
-                    BorderThickness="2" 
-                    CornerRadius="12"
+
+        <!-- Drawing Surface -->
+        <Border Background="#E5E7EB" Padding="18">
+            <Border BorderBrush="#D1D5DB"
+                    BorderThickness="2"
+                    CornerRadius="14"
                     Background="White">
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="20" 
-                                      Color="#000000" 
-                                      Opacity="0.1"
-                                      OffsetY="4" />
+                    <DropShadowEffect BlurRadius="22" Color="#000000" Opacity="0.08" OffsetY="5" />
                 </Border.Effect>
-                <ScrollViewer HorizontalScrollBarVisibility="Auto" 
-                              VerticalScrollBarVisibility="Auto">
-                    <Canvas Name="PixelCanvas" 
-                            Background="White" 
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <Canvas Name="PixelCanvas"
+                            Background="White"
                             PointerPressed="PixelCanvas_PointerPressed"
                             PointerMoved="PixelCanvas_PointerMoved"
                             PointerReleased="PixelCanvas_PointerReleased" />
@@ -173,5 +252,6 @@
             </Border>
         </Border>
     </DockPanel>
-    
+
 </Window>
+

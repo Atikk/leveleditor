@@ -1,13 +1,13 @@
-using System;
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Input;
-using Avalonia.Media;
-using Avalonia.Threading;
+﻿using System;
+using global::Avalonia;
+using global::Avalonia.Controls;
+using global::Avalonia.Input;
+using global::Avalonia.Media;
+using global::Avalonia.Threading;
 using AvaloniaInside.MonoGame;
 using Microsoft.Xna.Framework;
 
-namespace DotGameAvalonia.Controls
+namespace Dotgame.Avalonia.Controls
 {
     /// <summary>
     /// Wraps <see cref="MonoGameControl"/> and pumps the MonoGame game loop with a dispatcher timer
@@ -128,3 +128,5 @@ namespace DotGameAvalonia.Controls
         }
     }
 }
+
+

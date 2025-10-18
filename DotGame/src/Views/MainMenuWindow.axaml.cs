@@ -1,12 +1,12 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
-using Avalonia.Controls;
-using Avalonia.Interactivity;
-using Avalonia.Platform.Storage;
-using DotGameAvalonia.Models;
+using global::Avalonia.Controls;
+using global::Avalonia.Interactivity;
+using global::Avalonia.Platform.Storage;
+using Dotgame.Avalonia.Models;
 
-namespace DotGameAvalonia.Views
+namespace Dotgame.Avalonia.Views
 {
     public partial class MainMenuWindow : Window
     {
@@ -134,3 +134,5 @@ namespace DotGameAvalonia.Views
         }
     }
 }
+
+

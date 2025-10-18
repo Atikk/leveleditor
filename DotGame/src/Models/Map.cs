@@ -1,15 +1,16 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
-using Avalonia;
-using Avalonia.Media;
-using Avalonia.Media.Imaging;
-using Avalonia.Platform;
+using global::Avalonia;
+using global::Avalonia.Media;
+using global::Avalonia.Media.Imaging;
+using global::Avalonia.Platform;
 using SkiaSharp;
-using DotGameAvalonia.Models;
+using Dotgame.Avalonia.Models;
 
-namespace DotGameAvalonia.Models
+namespace Dotgame.Avalonia.Models
 {
     public sealed class Map
     {
@@ -19,42 +20,91 @@ namespace DotGameAvalonia.Models
         public int TileH { get; private set; }
 
         private string?[,] tiles = default!;
+        private int?[,]? tileIds;
         private readonly Dictionary<string, SKBitmap> imageCache = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, SKBitmap> atlasCache = new(StringComparer.Ordinal);
         public WriteableBitmap? Composite { get; private set; }
 
         private readonly List<Character> characters = new();
         private readonly List<Doodad> doodads = new();
         private readonly List<BehaviorTrigger> triggers = new();
 
-    public string? ExternalTileMapAsset { get; private set; }
+        public string? ExternalTileMapAsset { get; private set; }
+        public TilesetReference? Tileset { get; private set; }
+        public string? SourceDirectory => sourceDirectory;
+
+        private string? sourceDirectory;
 
         public Map() {}
 
         public static Map LoadFromJson(string path)
         {
             var json = File.ReadAllText(path);
-            var obj = JsonSerializer.Deserialize<MapDto>(json, new JsonSerializerOptions {
+            var obj = JsonSerializer.Deserialize<MapDto>(json, new JsonSerializerOptions
+            {
                 PropertyNameCaseInsensitive = true
             }) ?? throw new InvalidDataException("Invalid map JSON.");
 
-            if (obj.map is null || obj.cols <= 0 || obj.rows <= 0 || obj.tileW <= 0 || obj.tileH <= 0)
-                throw new InvalidDataException("Map is missing required fields (map/cols/rows/tileW/tileH).");
+            if (obj.cols <= 0 || obj.rows <= 0 || obj.tileW <= 0 || obj.tileH <= 0)
+                throw new InvalidDataException("Map is missing required fields (cols/rows/tileW/tileH).");
 
+            var tileMatrix = ResolveTileMatrix(obj);
+            if (tileMatrix is null)
+                throw new InvalidDataException("Map JSON is missing tile data; expected 'map' or 'layers[].tiles'.");
+
+            var baseDirectory = Path.GetDirectoryName(path);
             var map = new Map
             {
                 Cols = obj.cols,
                 Rows = obj.rows,
                 TileW = obj.tileW,
                 TileH = obj.tileH,
-                tiles = new string?[obj.rows, obj.cols]
+                tiles = new string?[obj.rows, obj.cols],
+                tileIds = null,
+                sourceDirectory = baseDirectory
             };
 
+            map.Tileset = CreateTileset(obj.tileset, baseDirectory, obj.tileW, obj.tileH);
+
+            int?[,]? tileIdBuffer = null;
             for (int y = 0; y < obj.rows; y++)
             {
-                var row = obj.map[y];
+                var row = y < tileMatrix.Length ? tileMatrix[y] : null;
                 for (int x = 0; x < obj.cols; x++)
-                    map.tiles[y, x] = row?[x];
+                {
+                    if (row == null || x >= row.Length)
+                        continue;
+
+                    var element = row[x];
+                    if (element.ValueKind == JsonValueKind.Null || element.ValueKind == JsonValueKind.Undefined)
+                        continue;
+
+                    if (element.ValueKind == JsonValueKind.String)
+                    {
+                        map.tiles[y, x] = element.GetString();
+                    }
+                    else if (element.ValueKind == JsonValueKind.Number)
+                    {
+                        tileIdBuffer ??= new int?[obj.rows, obj.cols];
+                        if (element.TryGetInt32(out var id))
+                        {
+                            tileIdBuffer[y, x] = id;
+                        }
+                        else
+                        {
+                            var dbl = element.GetDouble();
+                            tileIdBuffer[y, x] = (int)Math.Round(dbl);
+                        }
+                    }
+                    else
+                    {
+                        throw new InvalidDataException($"Unsupported tile value type '{element.ValueKind}' at ({x},{y}).");
+                    }
+                }
             }
+
+            map.tileIds = tileIdBuffer;
+            map.ExternalTileMapAsset = obj.externalTileMapAsset;
 
             if (obj.characters != null)
             {
@@ -136,11 +186,24 @@ namespace DotGameAvalonia.Models
             return tiles[ty, tx];
         }
 
+        public int? GetTileId(int tx, int ty)
+        {
+            if (!InBounds(tx, ty) || tileIds == null)
+                return null;
+
+            return tileIds[ty, tx];
+        }
+
+    public bool HasTileIds => tileIds != null && Tileset is not null;
+
         public void InitializeFromArray(int cols, int rows, int tileW, int tileH, string?[,] tileData,
             IEnumerable<Character>? characterData = null,
             IEnumerable<Doodad>? doodadData = null,
             IEnumerable<BehaviorTrigger>? triggerData = null,
-            string? externalTileMapAsset = null)
+            string? externalTileMapAsset = null,
+            int?[,]? tileIdData = null,
+            TilesetReference? tileset = null,
+            string? sourceDirectoryOverride = null)
         {
             if (tileData.GetLength(0) != rows || tileData.GetLength(1) != cols)
                 throw new ArgumentException("Tile data dimensions do not match provided rows/cols.", nameof(tileData));
@@ -150,11 +213,25 @@ namespace DotGameAvalonia.Models
             TileW = tileW;
             TileH = tileH;
             tiles = new string?[rows, cols];
+            tileIds = null;
 
             for (int y = 0; y < rows; y++)
             {
                 for (int x = 0; x < cols; x++)
                     tiles[y, x] = tileData[y, x];
+            }
+
+            if (tileIdData != null)
+            {
+                if (tileIdData.GetLength(0) != rows || tileIdData.GetLength(1) != cols)
+                    throw new ArgumentException("Tile ID data dimensions do not match provided rows/cols.", nameof(tileIdData));
+
+                tileIds = new int?[rows, cols];
+                for (int y = 0; y < rows; y++)
+                {
+                    for (int x = 0; x < cols; x++)
+                        tileIds[y, x] = tileIdData[y, x];
+                }
             }
 
             characters.Clear();
@@ -179,6 +256,8 @@ namespace DotGameAvalonia.Models
             }
 
             ExternalTileMapAsset = externalTileMapAsset;
+            Tileset = tileset;
+            sourceDirectory = sourceDirectoryOverride;
         }
 
         public Map Clone()
@@ -194,7 +273,18 @@ namespace DotGameAvalonia.Models
                     copy[y, x] = tiles?[y, x];
             }
 
-            clone.InitializeFromArray(Cols, Rows, TileW, TileH, copy, characters, doodads, triggers, ExternalTileMapAsset);
+            int?[,]? idCopy = null;
+            if (tileIds != null)
+            {
+                idCopy = new int?[Rows, Cols];
+                for (int y = 0; y < Rows; y++)
+                {
+                    for (int x = 0; x < Cols; x++)
+                        idCopy[y, x] = tileIds[y, x];
+                }
+            }
+
+            clone.InitializeFromArray(Cols, Rows, TileW, TileH, copy, characters, doodads, triggers, ExternalTileMapAsset, idCopy, Tileset, sourceDirectory);
             return clone;
         }
 
@@ -204,16 +294,20 @@ namespace DotGameAvalonia.Models
             var canvas = surface.Canvas;
             canvas.Clear(SKColors.White);
 
-            for (int y = 0; y < Rows; y++)
+            var drewTileset = DrawTilesFromTileset(canvas);
+            if (!drewTileset)
             {
-                for (int x = 0; x < Cols; x++)
+                for (int y = 0; y < Rows; y++)
                 {
-                    var url = tiles[y, x];
-                    if (!string.IsNullOrEmpty(url))
+                    for (int x = 0; x < Cols; x++)
                     {
-                        var img = GetOrDecode(url!);
-                        var destRect = SKRect.Create(x * TileW, y * TileH, TileW, TileH);
-                        canvas.DrawBitmap(img, destRect);
+                        var url = tiles[y, x];
+                        if (!string.IsNullOrEmpty(url))
+                        {
+                            var img = GetOrDecode(url!);
+                            var destRect = SKRect.Create(x * TileW, y * TileH, TileW, TileH);
+                            canvas.DrawBitmap(img, destRect);
+                        }
                     }
                 }
             }
@@ -249,9 +343,154 @@ namespace DotGameAvalonia.Models
             return bmp;
         }
 
+        private bool DrawTilesFromTileset(SKCanvas canvas)
+        {
+            var tileset = Tileset;
+            var ids = tileIds;
+            if (tileset is null || ids is null)
+                return false;
+
+            var atlasPath = tileset.AbsoluteTexturePath ?? tileset.TextureKey;
+            if (string.IsNullOrWhiteSpace(atlasPath))
+                return false;
+
+            var atlas = GetOrLoadAtlas(atlasPath);
+            if (atlas == null)
+                return false;
+
+            var anyDrawn = false;
+            for (int y = 0; y < Rows; y++)
+            {
+                for (int x = 0; x < Cols; x++)
+                {
+                    var id = ids[y, x];
+                    if (!id.HasValue)
+                        continue;
+
+                    if (!tileset.TryGetSourceRegion(id.Value, atlas.Width, out var region))
+                        continue;
+
+                    var sourceRect = new SKRectI(region.X, region.Y, region.X + region.Width, region.Y + region.Height);
+                    var destRect = SKRect.Create(x * TileW, y * TileH, TileW, TileH);
+                    canvas.DrawBitmap(atlas, sourceRect, destRect);
+                    anyDrawn = true;
+                }
+            }
+
+            return anyDrawn;
+        }
+
+        private SKBitmap? GetOrLoadAtlas(string key)
+        {
+            if (atlasCache.TryGetValue(key, out var cached))
+                return cached;
+
+            try
+            {
+                Bitmap bitmap;
+                var dispose = false;
+                if (File.Exists(key))
+                {
+                    bitmap = new Bitmap(key);
+                    dispose = true;
+                }
+                else
+                {
+                    bitmap = AssetManager.Instance.LoadBitmap(key);
+                }
+
+                try
+                {
+                    using var skBitmap = BitmapToSKBitmap(bitmap);
+                    var clone = skBitmap.Copy();
+                    atlasCache[key] = clone;
+                    return clone;
+                }
+                finally
+                {
+                    if (dispose)
+                        bitmap.Dispose();
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         public IReadOnlyList<Character> Characters => characters;
         public IReadOnlyList<Doodad> Doodads => doodads;
         public IReadOnlyList<BehaviorTrigger> Triggers => triggers;
+
+        private static JsonElement[][]? ResolveTileMatrix(MapDto dto)
+        {
+            if (dto.map != null && dto.map.Length > 0)
+                return dto.map;
+
+            if (dto.layers != null && dto.layers.Count > 0)
+            {
+                var index = dto.activeLayerIndex ?? 0;
+                index = Math.Clamp(index, 0, dto.layers.Count - 1);
+
+                JsonElement[][]? candidate = null;
+                if (index >= 0 && index < dto.layers.Count)
+                    candidate = dto.layers[index]?.tiles;
+
+                if (candidate == null)
+                    candidate = dto.layers.Select(layer => layer?.tiles).FirstOrDefault(t => t != null);
+
+                if (candidate != null)
+                    return candidate;
+            }
+
+            return null;
+        }
+
+        private static TilesetReference? CreateTileset(TilesetDto? dto, string? baseDirectory, int defaultTileWidth, int defaultTileHeight)
+        {
+            if (dto == null || string.IsNullOrWhiteSpace(dto.texture))
+                return null;
+
+            var textureKey = dto.texture!.Trim();
+            var tileWidth = dto.tileWidth ?? defaultTileWidth;
+            var tileHeight = dto.tileHeight ?? defaultTileHeight;
+            if (tileWidth <= 0 || tileHeight <= 0)
+                throw new InvalidDataException("Tileset tile dimensions must be positive.");
+
+            var columns = dto.columns ?? 0;
+            var tileCount = dto.tileCount ?? 0;
+            var margin = dto.margin ?? 0;
+            var spacing = dto.spacing ?? 0;
+            var firstId = dto.firstId ?? 0;
+
+            var absolute = ResolveTexturePath(textureKey, baseDirectory);
+            return new TilesetReference(textureKey, absolute, tileWidth, tileHeight, columns, tileCount, margin, spacing, firstId);
+        }
+
+        private static string? ResolveTexturePath(string textureKey, string? baseDirectory)
+        {
+            if (string.IsNullOrWhiteSpace(textureKey))
+                return null;
+
+            var normalized = textureKey.Replace('\\', '/');
+
+            if (Path.IsPathRooted(normalized) && File.Exists(normalized))
+                return Path.GetFullPath(normalized);
+
+            if (!string.IsNullOrWhiteSpace(baseDirectory))
+            {
+                var combined = Path.Combine(baseDirectory, normalized.Replace('/', Path.DirectorySeparatorChar));
+                if (File.Exists(combined))
+                    return Path.GetFullPath(combined);
+            }
+
+            var contentBase = AppContext.BaseDirectory ?? Environment.CurrentDirectory;
+            var fallback = Path.Combine(contentBase, normalized.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(fallback))
+                return Path.GetFullPath(fallback);
+
+            return null;
+        }
 
         public void AddCharacter(Character character)
         {
@@ -357,11 +596,35 @@ namespace DotGameAvalonia.Models
             public int rows { get; set; }
             public int tileW { get; set; }
             public int tileH { get; set; }
-            public string?[][]? map { get; set; }
+            public JsonElement[][]? map { get; set; }
+            public List<MapLayerDto>? layers { get; set; }
+            public int? activeLayerIndex { get; set; }
             public List<CharacterDto>? characters { get; set; }
             public List<DoodadDto>? doodads { get; set; }
             public List<TriggerDto>? triggers { get; set; }
             public string? externalTileMapAsset { get; set; }
+            public TilesetDto? tileset { get; set; }
+        }
+
+        private sealed class MapLayerDto
+        {
+            public JsonElement[][]? tiles { get; set; }
+            public string? id { get; set; }
+            public string? name { get; set; }
+            public bool? isVisible { get; set; }
+            public double? opacity { get; set; }
+        }
+
+        private sealed class TilesetDto
+        {
+            public string? texture { get; set; }
+            public int? columns { get; set; }
+            public int? tileCount { get; set; }
+            public int? margin { get; set; }
+            public int? spacing { get; set; }
+            public int? firstId { get; set; }
+            public int? tileWidth { get; set; }
+            public int? tileHeight { get; set; }
         }
 
         private sealed class CharacterDto
@@ -408,4 +671,84 @@ namespace DotGameAvalonia.Models
             return $"{label} @ {TileX},{TileY}";
         }
     }
+
+    public sealed class TilesetReference
+    {
+        public string TextureKey { get; }
+        public string? AbsoluteTexturePath { get; }
+        public int TileWidth { get; }
+        public int TileHeight { get; }
+        public int Columns { get; }
+        public int TileCount { get; }
+        public int Margin { get; }
+        public int Spacing { get; }
+        public int FirstId { get; }
+
+        internal TilesetReference(string textureKey, string? absoluteTexturePath, int tileWidth, int tileHeight, int columns, int tileCount, int margin, int spacing, int firstId)
+        {
+            TextureKey = textureKey;
+            AbsoluteTexturePath = absoluteTexturePath;
+            TileWidth = tileWidth;
+            TileHeight = tileHeight;
+            Columns = columns;
+            TileCount = tileCount;
+            Margin = Math.Max(0, margin);
+            Spacing = Math.Max(0, spacing);
+            FirstId = firstId;
+        }
+
+        public bool TryGetSourceRegion(int tileId, int atlasPixelWidth, out TileSourceRegion region)
+        {
+            region = default;
+            var index = tileId - FirstId;
+            if (index < 0)
+                return false;
+
+            if (TileCount > 0 && index >= TileCount)
+                return false;
+
+            var effectiveColumns = Columns;
+            if (effectiveColumns <= 0)
+            {
+                if (atlasPixelWidth <= 0)
+                    return false;
+
+                var usableWidth = atlasPixelWidth - Margin * 2;
+                var denominator = TileWidth + Spacing;
+                if (denominator <= 0)
+                    return false;
+
+                effectiveColumns = Math.Max(1, (usableWidth + Spacing) / denominator);
+            }
+
+            if (effectiveColumns <= 0)
+                return false;
+
+            var col = index % effectiveColumns;
+            var row = index / effectiveColumns;
+            var sourceX = Margin + col * (TileWidth + Spacing);
+            var sourceY = Margin + row * (TileHeight + Spacing);
+
+            region = new TileSourceRegion(sourceX, sourceY, TileWidth, TileHeight);
+            return true;
+        }
+    }
+
+    public readonly struct TileSourceRegion
+    {
+        public TileSourceRegion(int x, int y, int width, int height)
+        {
+            X = x;
+            Y = y;
+            Width = width;
+            Height = height;
+        }
+
+        public int X { get; }
+        public int Y { get; }
+        public int Width { get; }
+        public int Height { get; }
+    }
 }
+
+

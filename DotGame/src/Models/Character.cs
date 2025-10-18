@@ -1,11 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
-using Avalonia;
-using Avalonia.Media;
-using Avalonia.Media.Imaging;
+using global::Avalonia;
+using global::Avalonia.Media;
+using global::Avalonia.Media.Imaging;
 using SkiaSharp;
 
-namespace DotGameAvalonia.Models
+namespace Dotgame.Avalonia.Models
 {
     public enum Facing { Down, Left, Right, Up }
     public enum CharacterClass { Warrior, Mage, Thief }
@@ -263,3 +263,5 @@ namespace DotGameAvalonia.Models
         public override string ToString() => $"{Name} ({Class}) @ {TileX},{TileY}";
     }
 }
+
+

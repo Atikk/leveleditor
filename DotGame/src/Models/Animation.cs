@@ -1,8 +1,8 @@
-using System;
-using Avalonia.Media.Imaging;
+﻿using System;
+using global::Avalonia.Media.Imaging;
 using SkiaSharp;
 
-namespace DotGameAvalonia.Models
+namespace Dotgame.Avalonia.Models
 {
     public enum AnimationState { Idle, Walk, Attack, Hit, Death }
 
@@ -63,3 +63,5 @@ namespace DotGameAvalonia.Models
         }
     }
 }
+
+

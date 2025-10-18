@@ -1,6 +1,6 @@
-using Avalonia.Controls;
+﻿using global::Avalonia.Controls;
 
-namespace DotGameAvalonia;
+namespace Dotgame.Avalonia;
 
 public partial class MainWindow : Window
 {
@@ -9,3 +9,4 @@ public partial class MainWindow : Window
         InitializeComponent();
     }
 }
+

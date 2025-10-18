@@ -1,6 +1,6 @@
-using System;
+﻿using System;
 
-namespace DotGameAvalonia.Models
+namespace Dotgame.Avalonia.Models
 {
     public enum CombatAction { Attack, Defend, None }
 
@@ -105,3 +105,4 @@ namespace DotGameAvalonia.Models
         }
     }
 }
+

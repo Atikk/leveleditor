@@ -1,7 +1,7 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace DotGameAvalonia.Engine.Components
+namespace Dotgame.Avalonia.Engine.Components
 {
     /// <summary>
     /// Renders a texture at the owning entity's transform.
@@ -35,3 +35,4 @@ namespace DotGameAvalonia.Engine.Components
         }
     }
 }
+

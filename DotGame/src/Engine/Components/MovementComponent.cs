@@ -1,6 +1,6 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 
-namespace DotGameAvalonia.Engine.Components
+namespace Dotgame.Avalonia.Engine.Components
 {
     /// <summary>
     /// Integrates basic velocity and acceleration to move the owning entity.
@@ -55,3 +55,4 @@ namespace DotGameAvalonia.Engine.Components
         }
     }
 }
+

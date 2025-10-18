@@ -1,6 +1,6 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 
-namespace DotGameAvalonia.Engine.Components
+namespace Dotgame.Avalonia.Engine.Components
 {
     /// <summary>
     /// Tracks the position, rotation, and scale of an entity within the world.
@@ -19,3 +19,4 @@ namespace DotGameAvalonia.Engine.Components
         }
     }
 }
+

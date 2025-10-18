@@ -1,11 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using DotGameAvalonia.Engine.Components;
+using Dotgame.Avalonia.Engine.Components;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace DotGameAvalonia.Engine
+namespace Dotgame.Avalonia.Engine
 {
     /// <summary>
     /// Lightweight entity composed of modular components.
@@ -28,6 +28,8 @@ namespace DotGameAvalonia.Engine
 
         public IReadOnlyList<IGameEntityComponent> Components => _components;
 
+        public bool IsMarkedForRemoval { get; private set; }
+
         public T AddComponent<T>(T component) where T : IGameEntityComponent
         {
             if (_components.Contains(component))
@@ -37,6 +39,16 @@ namespace DotGameAvalonia.Engine
             component.Initialize();
             _components.Add(component);
             return component;
+        }
+
+        public void MarkForRemoval()
+        {
+            IsMarkedForRemoval = true;
+        }
+
+        internal void ClearRemovalFlag()
+        {
+            IsMarkedForRemoval = false;
         }
 
         public bool RemoveComponent<T>(T component) where T : IGameEntityComponent
@@ -72,3 +84,4 @@ namespace DotGameAvalonia.Engine
         }
     }
 }
+

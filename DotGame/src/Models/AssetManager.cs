@@ -1,9 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using Avalonia.Media.Imaging;
+using global::Avalonia.Media.Imaging;
 
-namespace DotGameAvalonia.Models
+namespace Dotgame.Avalonia.Models
 {
     public class AssetManager
     {
@@ -36,3 +36,4 @@ namespace DotGameAvalonia.Models
         }
     }
 }
+

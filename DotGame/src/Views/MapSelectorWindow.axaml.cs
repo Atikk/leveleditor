@@ -1,10 +1,10 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
-using Avalonia.Controls;
-using Avalonia.Interactivity;
+using global::Avalonia.Controls;
+using global::Avalonia.Interactivity;
 
-namespace DotGameAvalonia.Views
+namespace Dotgame.Avalonia.Views
 {
     public partial class MapSelectorWindow : Window
     {
@@ -96,3 +96,5 @@ namespace DotGameAvalonia.Views
         }
     }
 }
+
+

@@ -1,9 +1,9 @@
-using System;
+﻿using System;
 using Microsoft.Xna.Framework;
 using MonoGame.Extended;
-using DotGameAvalonia.Engine;
+using Dotgame.Avalonia.Engine;
 
-namespace DotGameAvalonia.Engine.Components
+namespace Dotgame.Avalonia.Engine.Components
 {
     /// <summary>
     /// Axis-aligned bounding box collider with optional trigger/static semantics.
@@ -46,3 +46,4 @@ namespace DotGameAvalonia.Engine.Components
         }
     }
 }
+
