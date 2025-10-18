@@ -9,7 +9,70 @@
     
     <Grid Background="#1F2937">
         <Canvas Name="GameCanvas" Background="#1F2937" />
-        
+
+        <!-- HUD overlays -->
+        <Grid HorizontalAlignment="Stretch"
+              VerticalAlignment="Top"
+              Margin="16"
+              ColumnDefinitions="Auto,*"
+              Panel.ZIndex="5">
+            <!-- Player Stats HUD -->
+            <Border Grid.Column="0"
+                    Background="White"
+                    CornerRadius="12"
+                    Padding="18,14"
+                    BorderBrush="#E5E7EB"
+                    BorderThickness="2"
+                    IsHitTestVisible="False">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="20" 
+                                      Color="#000000" 
+                                      Opacity="0.15" 
+                                      OffsetY="4" />
+                </Border.Effect>
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Player Stats"
+                               FontSize="13"
+                               FontWeight="Bold"
+                               Foreground="#6B7280" />
+                    <TextBlock Name="TxtPlayerStats" 
+                               Foreground="#111827" 
+                               FontSize="14"
+                               FontWeight="Medium" />
+                </StackPanel>
+            </Border>
+
+            <!-- Controls Hint -->
+            <Border Grid.Column="1"
+                    HorizontalAlignment="Right"
+                    Background="White"
+                    CornerRadius="12"
+                    Padding="16,12"
+                    BorderBrush="#E5E7EB"
+                    BorderThickness="1"
+                    Margin="16,0,0,0"
+                    IsHitTestVisible="False">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="20" 
+                                      Color="#000000" 
+                                      Opacity="0.15" 
+                                      OffsetY="4" />
+                </Border.Effect>
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Controls"
+                               FontSize="12"
+                               FontWeight="Bold"
+                               Foreground="#6B7280" />
+                    <TextBlock Text="WASD / Arrow Keys - Move"
+                               FontSize="11"
+                               Foreground="#9CA3AF" />
+                    <TextBlock Text="ESC - Exit Game"
+                               FontSize="11"
+                               Foreground="#9CA3AF" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
         <!-- Combat UI Overlay -->
         <Border Name="CombatUI" 
                 IsVisible="False" 
@@ -129,62 +192,6 @@
                         <TextBlock Text="Defend" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" />
                     </Button>
                 </StackPanel>
-            </StackPanel>
-        </Border>
-        
-        <!-- Player Stats HUD -->
-        <Border HorizontalAlignment="Left" 
-                VerticalAlignment="Top" 
-                Margin="16"
-                Background="White"
-                CornerRadius="12"
-                Padding="18,14"
-                BorderBrush="#E5E7EB"
-                BorderThickness="2">
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="20" 
-                                  Color="#000000" 
-                                  Opacity="0.15"
-                                  OffsetY="4" />
-            </Border.Effect>
-            <StackPanel Spacing="6">
-                <TextBlock Text="Player Stats"
-                           FontSize="13"
-                           FontWeight="Bold"
-                           Foreground="#6B7280" />
-                <TextBlock Name="TxtPlayerStats" 
-                           Foreground="#111827" 
-                           FontSize="14"
-                           FontWeight="Medium" />
-            </StackPanel>
-        </Border>
-        
-        <!-- Controls Hint -->
-        <Border HorizontalAlignment="Right" 
-                VerticalAlignment="Top" 
-                Margin="16"
-                Background="White"
-                CornerRadius="12"
-                Padding="16,12"
-                BorderBrush="#E5E7EB"
-                BorderThickness="1">
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="20" 
-                                  Color="#000000" 
-                                  Opacity="0.15"
-                                  OffsetY="4" />
-            </Border.Effect>
-            <StackPanel Spacing="4">
-                <TextBlock Text="Controls"
-                           FontSize="12"
-                           FontWeight="Bold"
-                           Foreground="#6B7280" />
-                <TextBlock Text="WASD / Arrow Keys - Move"
-                           FontSize="11"
-                           Foreground="#9CA3AF" />
-                <TextBlock Text="ESC - Exit Game"
-                           FontSize="11"
-                           Foreground="#9CA3AF" />
             </StackPanel>
         </Border>
     </Grid>

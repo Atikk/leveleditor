@@ -12,55 +12,66 @@
         <!-- Modern Toolbar -->
         <Border DockPanel.Dock="Top" 
                 Background="White" 
-                Padding="16,10" 
+                Padding="16,8" 
                 BorderBrush="#E5E7EB" 
                 BorderThickness="0,0,0,1">
-            <Grid RowDefinitions="Auto,Auto">
+            <Grid RowDefinitions="Auto,Auto"
+                  ColumnDefinitions="*,Auto">
                 <!-- Title Row -->
-        <StackPanel Grid.Row="0"
-                Orientation="Horizontal"
-                Spacing="10"
-                Margin="0,0,0,6">
-            <TextBlock Text="Map Editor"
-                               FontSize="18"
-                               FontWeight="Bold"
-                               Foreground="#111827"
+                <TextBlock Grid.Row="0"
+                           Grid.Column="0"
+                           Text="Map Editor"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Foreground="#111827"
+                           VerticalAlignment="Center"
+                           Margin="0,0,0,4" />
+                <StackPanel Grid.Row="0"
+                            Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="12"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="Ctrl+S Save   Ctrl+P Preview   Ctrl+R Reload Data"
+                               FontSize="12"
+                               Foreground="#6B7280"
                                VerticalAlignment="Center" />
                 </StackPanel>
 
                 <!-- Tools Row -->
                 <ScrollViewer Grid.Row="1"
+                              Grid.ColumnSpan="2"
                               HorizontalScrollBarVisibility="Auto"
                               VerticalScrollBarVisibility="Disabled"
-                              Margin="0,-2,0,0">
-                    <WrapPanel Name="MainToolBar" Orientation="Horizontal">
+                              Margin="0,2,0,0">
+                    <WrapPanel Name="MainToolBar" Orientation="Horizontal" VerticalAlignment="Center">
                         <WrapPanel.Styles>
                             <Style Selector="WrapPanel > Control">
-                                <Setter Property="Margin" Value="0,0,6,6" />
+                                <Setter Property="Margin" Value="0,0,8,8" />
+                                <Setter Property="Height" Value="36" />
                             </Style>
                         </WrapPanel.Styles>
                         <ToggleButton Name="ToolBrush" Content="Brush" IsChecked="True" MinWidth="85" />
                         <ToggleButton Name="ToolEraser" Content="Eraser" MinWidth="85" />
                         <ToggleButton Name="ToolFill" Content="Fill" MinWidth="80" />
-                        <ToggleButton Name="ToolRect" Content="Rectangle" MinWidth="80" />
+                        <ToggleButton Name="ToolRect" Content="Rectangle" MinWidth="90" />
                         <ToggleButton Name="ToolLine" Content="Line" MinWidth="80" />
                         <ToggleButton Name="ToolPicker" Content="Picker" MinWidth="85" />
                         <ToggleButton Name="ToolSelect" Content="Select" MinWidth="85" />
                         <ToggleButton Name="ToolStamp" Content="Stamp" MinWidth="85" />
                         <ToggleButton Name="ToolCollision" Content="Collision" MinWidth="95" />
                         
-                        <Border Width="2" Height="32" Background="#E5E7EB" Margin="6,0" />
+                        <Border Width="2" Height="28" Background="#E5E7EB" Margin="8,0" />
                         
                         <Button Name="BtnUndo" Content="Undo" MinWidth="80" />
                         <Button Name="BtnRedo" Content="Redo" MinWidth="80" />
                         
-                        <Border Width="2" Height="32" Background="#E5E7EB" Margin="6,0" />
+                        <Border Width="2" Height="28" Background="#E5E7EB" Margin="8,0" />
                         
                         <Button Name="BtnZoomOut" Content="-" Width="38" />
                         <Button Name="BtnZoomReset" Content="100%" Width="70" />
                         <Button Name="BtnZoomIn" Content="+" Width="38" />
                         
-                        <Border Width="2" Height="32" Background="#E5E7EB" Margin="6,0" />
+                        <Border Width="2" Height="28" Background="#E5E7EB" Margin="8,0" />
                         
                         <Button Name="BtnSaveMap" Content="Save" MinWidth="90" Classes="success" />
                         <Button Name="BtnLoadMap" Content="Load" MinWidth="90" />
@@ -73,9 +84,9 @@
         </Border>
 
         <!-- Status Bar -->
-        <Border DockPanel.Dock="Bottom" 
-                Background="White" 
-                Padding="12,8" 
+    <Border DockPanel.Dock="Bottom" 
+        Background="White" 
+        Padding="12,6" 
                 BorderBrush="#E5E7EB" 
                 BorderThickness="0,1,0,0">
             <StackPanel Orientation="Horizontal" Spacing="20">
@@ -103,6 +114,13 @@
                            Foreground="#6B7280"
                            VerticalAlignment="Center"
                            FontSize="13" />
+                <TextBlock Name="StatusAlertText"
+                           Text=""
+                           Foreground="#B91C1C"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           FontSize="13"
+                           IsVisible="False" />
             </StackPanel>
         </Border>
 
@@ -274,11 +292,19 @@
                                     BorderBrush="#E5E7EB"
                                     BorderThickness="1"
                                     CornerRadius="8"
-                                    Padding="10">
-                                <TextBlock Name="GameDataStatusText"
-                                           Text="Game data not loaded."
-                                           Foreground="#1F2937"
-                                           TextWrapping="Wrap" />
+                                    Padding="12">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Name="GameDataStatusText"
+                                               Text="Game data not loaded."
+                                               Foreground="#1F2937"
+                                               TextWrapping="Wrap"
+                                               FontSize="13" />
+                                    <Button Name="GameDataStatusDismissButton"
+                                            Content="Dismiss"
+                                            MinWidth="90"
+                                            HorizontalAlignment="Left"
+                                            IsVisible="False" />
+                                </StackPanel>
                             </Border>
 
                             <TextBlock Text="Dialogues"
@@ -408,6 +434,35 @@
                         </Border>
                     </StackPanel>
                 </TabItem>
+                <TabItem Header="Logs">
+                    <StackPanel Margin="14" Spacing="10">
+                        <ListBox Name="LogList" Height="340" Background="Transparent" BorderThickness="0" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:CompileBindings="False">
+                                    <Border Background="#FFFFFF"
+                                            BorderBrush="#E5E7EB"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            Padding="10"
+                                            Margin="0,0,0,8">
+                                        <StackPanel Spacing="6">
+                                            <TextBlock Text="{Binding Header}"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{Binding Accent}" />
+                                            <TextBlock Text="{Binding Message}"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="#111827" />
+                                            <TextBlock Text="{Binding ExceptionMessage}"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="#9B1C1C"
+                                                       IsVisible="{Binding HasException}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </StackPanel>
+                </TabItem>
             </TabControl>
         </Border>
 
@@ -449,19 +504,26 @@
                                                                VerticalAlignment="Stretch" />
                             <Border x:Name="RuntimePreviewStatusOverlay"
                                     Background="#AA111827"
+                                    Margin="12"
                                     HorizontalAlignment="Stretch"
                                     VerticalAlignment="Stretch"
-                                    Padding="24,72,24,32"
+                                    Padding="24,64,24,24"
                                     IsHitTestVisible="False"
                                     IsVisible="False">
                                 <Border Background="#272D3A"
                                         Opacity="0.92"
                                         CornerRadius="12"
                                         Padding="20"
-                                        MaxWidth="420"
+                                        MaxWidth="440"
                                         HorizontalAlignment="Center"
-                                        VerticalAlignment="Top">
-                                    <StackPanel Spacing="12">
+                                        VerticalAlignment="Top"
+                                        Margin="0,16,0,0">
+                                    <StackPanel Spacing="10">
+                                        <TextBlock Text="Preview Notice"
+                                                   FontSize="12"
+                                                   FontWeight="Bold"
+                                                   Foreground="#9CA3AF"
+                                                   TextAlignment="Center" />
                                         <TextBlock x:Name="RuntimePreviewStatusText"
                                                    Text="Preview initializing..."
                                                    Foreground="#F9FAFB"
@@ -471,26 +533,27 @@
                                                    TextWrapping="Wrap"
                                                    LineHeight="22" />
                                         <TextBlock x:Name="RuntimePreviewStatusHintText"
-                                                   Text="Press Esc or dismiss once you're ready."
+                                                   Text="Press Esc or choose Dismiss when ready."
                                                    Foreground="#D1D5DB"
                                                    FontSize="13"
                                                    TextAlignment="Center"
                                                    TextWrapping="Wrap"
                                                    IsVisible="False" />
-                    <Button x:Name="RuntimePreviewStatusLoadMapButton"
-                        Content="Load Map"
-                        HorizontalAlignment="Center"
-                        MinWidth="140"
-                        Classes="primary"
-                        IsVisible="False"
-                        Click="RuntimePreviewStatusLoadMapButton_Click" />
-                                        <Button x:Name="RuntimePreviewStatusDismissButton"
-                                                Content="Dismiss"
-                                                HorizontalAlignment="Center"
-                                                MinWidth="120"
-                                                Classes="primary"
-                                                IsVisible="False"
-                                                Click="RuntimePreviewStatusDismissButton_Click" />
+                                        <StackPanel Orientation="Horizontal"
+                                                    HorizontalAlignment="Center"
+                                                    Spacing="12">
+                                            <Button x:Name="RuntimePreviewStatusLoadMapButton"
+                                                    Content="Load Map"
+                                                    MinWidth="120"
+                                                    Classes="primary"
+                                                    IsVisible="False"
+                                                    Click="RuntimePreviewStatusLoadMapButton_Click" />
+                                            <Button x:Name="RuntimePreviewStatusDismissButton"
+                                                    Content="Dismiss"
+                                                    MinWidth="120"
+                                                    IsVisible="False"
+                                                    Click="RuntimePreviewStatusDismissButton_Click" />
+                                        </StackPanel>
                                     </StackPanel>
                                 </Border>
                             </Border>

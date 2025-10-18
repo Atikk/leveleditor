@@ -27,6 +27,7 @@ using Dotgame.Avalonia.Models;
 using Dotgame.Avalonia.Controls;
 using global::Avalonia.Threading;
 using DotGame.Core.Async;
+using DotGame.Core.Logging;
 using DotGame.Core.Resources;
 using Dotgame.Avalonia.MonoGameLayer;
 using Dotgame.Avalonia.Services;
@@ -419,6 +420,53 @@ namespace Dotgame.Avalonia.Views
             public TilesetDto? Tileset { get; set; }
         }
 
+        private sealed class LogEntryViewModel
+        {
+            public LogEntryViewModel(in LogEvent logEvent)
+            {
+                Timestamp = logEvent.Timestamp;
+                Level = logEvent.Level;
+                Category = logEvent.Category;
+                Message = logEvent.Message;
+                ExceptionMessage = logEvent.Exception?.Message;
+                Accent = ResolveBrush(logEvent.Level);
+            }
+
+            public DateTimeOffset Timestamp { get; }
+
+            public LogLevel Level { get; }
+
+            public string Category { get; }
+
+            public string Message { get; }
+
+            public string? ExceptionMessage { get; }
+
+            public IBrush Accent { get; }
+
+            public string TimestampText => Timestamp.ToLocalTime().ToString("HH:mm:ss");
+
+            public string LevelText => Level.ToString().ToUpperInvariant();
+
+            public string Header => $"{TimestampText} [{LevelText}] {Category}";
+
+            public bool HasException => !string.IsNullOrWhiteSpace(ExceptionMessage);
+
+            private static IBrush ResolveBrush(LogLevel level)
+            {
+                return level switch
+                {
+                    LogLevel.Trace => Brushes.Gray,
+                    LogLevel.Debug => Brushes.SlateBlue,
+                    LogLevel.Information => Brushes.SeaGreen,
+                    LogLevel.Warning => Brushes.DarkOrange,
+                    LogLevel.Error => Brushes.OrangeRed,
+                    LogLevel.Critical => Brushes.DarkRed,
+                    _ => Brushes.Gray
+                };
+            }
+        }
+
         private readonly List<TileEntry> tiles = new();
         private TileEntry? selectedTile;
         private Bitmap? spriteSheetImage;
@@ -428,9 +476,11 @@ namespace Dotgame.Avalonia.Views
         private int brushSize = 1;
         private readonly ObservableCollection<LayerState> layers = new();
         private readonly ObservableCollection<string> historyEntries = new();
-        private readonly ObservableCollection<GameDataEntrySummary> dialogueSummaries = new();
-        private readonly ObservableCollection<GameDataEntrySummary> questSummaries = new();
-        private readonly ObservableCollection<GameDataEntrySummary> cutsceneSummaries = new();
+    private readonly ObservableCollection<GameDataEntrySummary> dialogueSummaries = new();
+    private readonly ObservableCollection<GameDataEntrySummary> questSummaries = new();
+    private readonly ObservableCollection<GameDataEntrySummary> cutsceneSummaries = new();
+    private readonly ObservableCollection<LogEntryViewModel> logEntries = new();
+    private readonly ILogger logger = LogManager.GetLogger<EditorWindow>();
         private int activeLayerIndex;
         private bool isMouseDown;
         private Border? selectedTileBorder;
@@ -473,10 +523,12 @@ namespace Dotgame.Avalonia.Views
         private TextBlock? statusToolText;
         private TextBlock? statusCoordText;
         private TextBlock? statusTileText;
-        private TextBlock? statusZoomText;
+    private TextBlock? statusZoomText;
+    private TextBlock? statusAlertText;
         private StackPanel? propertiesPanel;
         private ListBox? historyList;
         private ListBox? layerList;
+    private ListBox? logList;
         private CheckBox? gridVisibilityCheck;
     private ScrollViewer? viewportScroll;
     private TabControl? viewportTabControl;
@@ -491,6 +543,7 @@ namespace Dotgame.Avalonia.Views
     private string? tabSwitchProfileTarget;
     private bool runtimePreviewInitialized;
     private TextBlock? gameDataStatusText;
+    private Button? gameDataStatusDismissButton;
     private ListBox? dialogueList;
     private ListBox? questList;
     private ListBox? cutsceneList;
@@ -501,8 +554,14 @@ namespace Dotgame.Avalonia.Views
 
         private const double MinZoom = 0.25;
         private const double MaxZoom = 4.0;
-        private const int MaxHistoryEntries = 200;
+    private const int MaxHistoryEntries = 200;
+    private const int MaxLogEntries = 300;
+        private const string RuntimePreviewDefaultHint = "Press Esc or choose Dismiss when ready.";
     private const string DefaultPreviewMapFileName = "default_map.json";
+
+            private int warningCount;
+            private int errorCount;
+            private EventHandler<LogEvent>? bufferedLogHandler;
 
         private static string ResolveDefaultPreviewMapPath()
         {
@@ -765,7 +824,7 @@ namespace Dotgame.Avalonia.Views
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Warning: Failed to resolve tile id {parsedId} via tileset: {ex.Message}");
+                    logger.Warn($"Failed to resolve tile id {parsedId} via tileset.", ex);
                 }
             }
 
@@ -778,7 +837,7 @@ namespace Dotgame.Avalonia.Views
 
             if (!System.IO.File.Exists(resolved))
             {
-                Console.WriteLine($"Warning: Tile asset not found at {resolved}.");
+                logger.Warn($"Tile asset not found at {resolved}.");
                 return null;
             }
 
@@ -788,7 +847,7 @@ namespace Dotgame.Avalonia.Views
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to load tile asset '{resolved}': {ex.Message}");
+                logger.Error($"Failed to load tile asset '{resolved}'.", ex);
                 return null;
             }
         }
@@ -834,7 +893,7 @@ namespace Dotgame.Avalonia.Views
                                 entry = CreateTileEntryFromNumber(element, tilesetState);
                                 break;
                             default:
-                                Console.WriteLine($"Warning: Unsupported tile value '{element.ValueKind}' encountered during load.");
+                                logger.Warn($"Unsupported tile value '{element.ValueKind}' encountered during load.");
                                 break;
                         }
 
@@ -851,7 +910,7 @@ namespace Dotgame.Avalonia.Views
         {
             if (tilesetState == null)
             {
-                Console.WriteLine("Warning: Numeric tile encountered but no active tileset is available; skipping.");
+                logger.Warn("Numeric tile encountered but no active tileset is available; skipping.");
                 return null;
             }
 
@@ -872,7 +931,7 @@ namespace Dotgame.Avalonia.Views
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Warning: Failed to create tile entry for id {tileId}: {ex.Message}");
+                logger.Warn($"Failed to create tile entry for id {tileId}.", ex);
                 return null;
             }
         }
@@ -949,7 +1008,7 @@ namespace Dotgame.Avalonia.Views
         {
             if (layers.Count <= 1)
             {
-                Console.WriteLine("Cannot remove the final layer.");
+                logger.Warn("Cannot remove the final layer.");
                 return;
             }
 
@@ -1019,6 +1078,7 @@ namespace Dotgame.Avalonia.Views
             InitializeLayerSystem();
             AttachEvents();
             InitializeEditorUI();
+            InitializeLoggingHooks();
             SyncMapFromEditorState();
         }
 
@@ -1065,9 +1125,11 @@ namespace Dotgame.Avalonia.Views
             statusCoordText = this.FindControl<TextBlock>("StatusCoordText");
             statusTileText = this.FindControl<TextBlock>("StatusTileText");
             statusZoomText = this.FindControl<TextBlock>("StatusZoomText");
+            statusAlertText = this.FindControl<TextBlock>("StatusAlertText");
             propertiesPanel = this.FindControl<StackPanel>("PropertiesPanel");
             historyList = this.FindControl<ListBox>("HistoryList");
             layerList = this.FindControl<ListBox>("LayerList");
+            logList = this.FindControl<ListBox>("LogList");
             characterList = this.FindControl<ListBox>("CharacterList");
             doodadList = this.FindControl<ListBox>("DoodadList");
             triggerList = this.FindControl<ListBox>("TriggerList");
@@ -1082,6 +1144,7 @@ namespace Dotgame.Avalonia.Views
             runtimePreviewStatusDismissButton = this.FindControl<Button>("RuntimePreviewStatusDismissButton");
             assetTabs = this.FindControl<TabControl>("AssetTabs");
             gameDataStatusText = this.FindControl<TextBlock>("GameDataStatusText");
+            gameDataStatusDismissButton = this.FindControl<Button>("GameDataStatusDismissButton");
             dialogueList = this.FindControl<ListBox>("DialogueList");
             questList = this.FindControl<ListBox>("QuestList");
             cutsceneList = this.FindControl<ListBox>("CutsceneList");
@@ -1235,6 +1298,9 @@ namespace Dotgame.Avalonia.Views
                 triggerList.ItemsSource = triggers;
             }
 
+            if (gameDataStatusDismissButton != null)
+                gameDataStatusDismissButton.Click += GameDataStatusDismissButton_Click;
+
             if (assetTabs != null)
                 assetTabs.SelectionChanged += AssetTabs_SelectionChanged;
             SelectPrimaryTool(EditorTool.Brush);
@@ -1246,11 +1312,18 @@ namespace Dotgame.Avalonia.Views
 
             SyncMapFromEditorState();
             RenderMap();
-            SyncMapFromEditorState();
         }
 
         protected override void OnClosed(EventArgs e)
         {
+            if (bufferedLogHandler != null)
+            {
+                var sink = LogManager.GetBufferedSink();
+                if (sink != null)
+                    sink.LogReceived -= bufferedLogHandler;
+                bufferedLogHandler = null;
+            }
+
             resourcePumpTimer.Stop();
             resourcePumpTimer.Tick -= resourcePumpHandler;
 
@@ -1332,7 +1405,7 @@ namespace Dotgame.Avalonia.Views
             tabSwitchStopwatch = Stopwatch.StartNew();
             tabSwitchLayoutPassCount = 0;
             viewportTabControl.LayoutUpdated += ViewportTabControl_LayoutUpdated;
-            Console.WriteLine($"[LayoutProfile] Measuring layout for tab '{tabSwitchProfileTarget}'.");
+            logger.Debug($"[LayoutProfile] Measuring layout for tab '{tabSwitchProfileTarget}'.");
         }
 
         private void StopTabLayoutProfiling()
@@ -1352,12 +1425,12 @@ namespace Dotgame.Avalonia.Views
 
             tabSwitchLayoutPassCount++;
             var elapsed = tabSwitchStopwatch.Elapsed.TotalMilliseconds;
-            Console.WriteLine($"[LayoutProfile] Tab '{tabSwitchProfileTarget ?? "Unknown"}' layout pass {tabSwitchLayoutPassCount} @ {elapsed:F2} ms.");
+            logger.Debug($"[LayoutProfile] Tab '{tabSwitchProfileTarget ?? "Unknown"}' layout pass {tabSwitchLayoutPassCount} @ {elapsed:F2} ms.");
 
             if (tabSwitchLayoutPassCount >= 1)
             {
                 tabSwitchStopwatch.Stop();
-                Console.WriteLine($"[LayoutProfile] Tab '{tabSwitchProfileTarget ?? "Unknown"}' layout complete in {elapsed:F2} ms across {tabSwitchLayoutPassCount} pass{(tabSwitchLayoutPassCount == 1 ? string.Empty : "es") }.");
+                logger.Debug($"[LayoutProfile] Tab '{tabSwitchProfileTarget ?? "Unknown"}' layout complete in {elapsed:F2} ms across {tabSwitchLayoutPassCount} pass{(tabSwitchLayoutPassCount == 1 ? string.Empty : "es") }.");
                 StopTabLayoutProfiling();
             }
         }
@@ -1385,13 +1458,13 @@ namespace Dotgame.Avalonia.Views
             if (gameDataPreviewService.IsLoading)
             {
                 PushHistory("Game data load already in progress.");
-                UpdateGameDataStatus("Game data reload already in progressâ€¦");
+                UpdateGameDataStatus("Game data reload already in progress...");
                 return;
             }
 
             gameDataLoaded = false;
             PushHistory("Loading game data...");
-            UpdateGameDataStatus("Loading game dataâ€¦");
+            UpdateGameDataStatus("Loading game data...");
             ClearGameDataSummaries();
 
             gameDataPreviewService.ReloadAsync(
@@ -1433,16 +1506,29 @@ namespace Dotgame.Avalonia.Views
             if (gameDataStatusText == null)
                 return;
 
+            void Apply()
+            {
+                var normalized = message ?? string.Empty;
+                if (!string.Equals(gameDataStatusText.Text, normalized, StringComparison.Ordinal))
+                    gameDataStatusText.Text = normalized;
+
+                if (gameDataStatusDismissButton != null)
+                    gameDataStatusDismissButton.IsVisible = !string.IsNullOrWhiteSpace(normalized);
+            }
+
             if (Dispatcher.UIThread.CheckAccess())
             {
-                if (string.Equals(gameDataStatusText.Text, message, StringComparison.Ordinal))
-                    return;
-                gameDataStatusText.Text = message;
+                Apply();
             }
             else
             {
-                Dispatcher.UIThread.Post(() => UpdateGameDataStatus(message));
+                Dispatcher.UIThread.Post(Apply);
             }
+        }
+
+        private void GameDataStatusDismissButton_Click(object? sender, RoutedEventArgs e)
+        {
+            UpdateGameDataStatus(string.Empty);
         }
 
         private void ApplyGameDataSummaries()
@@ -1519,7 +1605,7 @@ namespace Dotgame.Avalonia.Views
             if (runtimePreviewHost.GetVisualRoot() == null)
             {
                 LogPreviewStatus("InitializeRuntimePreview deferred; visual root not ready yet.");
-                UpdateRuntimePreviewStatus("Preview surface not ready yetâ€¦", true, false);
+                UpdateRuntimePreviewStatus("Preview surface not ready yet...", true, false);
                 return;
             }
 
@@ -1541,7 +1627,7 @@ namespace Dotgame.Avalonia.Views
             }
 
             LogPreviewStatus("No cached EditorGame instance found; proceeding with initialization.");
-            UpdateRuntimePreviewStatus("Initializing runtime previewâ€¦", true, false);
+            UpdateRuntimePreviewStatus("Initializing runtime preview...", true, false);
 
             EnsureGameDataLoaded();
             SyncMapFromEditorState(suppressPreviewUpdate: true);
@@ -1627,7 +1713,7 @@ namespace Dotgame.Avalonia.Views
                     message += " No game data preview available.";
                 }
 
-                Console.WriteLine(message);
+                logger.Info(message);
                 Dispatcher.UIThread.Post(() => PushHistory(message));
             };
 
@@ -1636,8 +1722,7 @@ namespace Dotgame.Avalonia.Views
 
         private static void LogPreviewStatus(string message)
         {
-            var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
-            Console.WriteLine($"[EditorPreview] {timestamp} {message}");
+            LogManager.GetLogger("RuntimePreview").Debug(message);
         }
 
         private void UpdateRuntimePreviewStatus(string message, bool isVisible, bool isError, bool showLoadMapButton = false, string? hintMessage = null)
@@ -1648,9 +1733,12 @@ namespace Dotgame.Avalonia.Views
                     return;
 
                 runtimePreviewStatusOverlay.IsVisible = isVisible;
-                runtimePreviewStatusOverlay.IsHitTestVisible = isVisible && (isError || showLoadMapButton);
+                var hasMessage = !string.IsNullOrWhiteSpace(message);
+                var allowDismiss = isVisible && (hasMessage || isError || showLoadMapButton);
+
+                runtimePreviewStatusOverlay.IsHitTestVisible = allowDismiss;
                 runtimePreviewStatusText.Text = isVisible ? message : string.Empty;
-                runtimePreviewStatusText.Foreground = isError ? Brushes.OrangeRed : Brushes.White;
+                runtimePreviewStatusText.Foreground = isError ? Brushes.Tomato : Brushes.WhiteSmoke;
                 if (runtimePreviewStatusHintText != null)
                 {
                     if (!string.IsNullOrWhiteSpace(hintMessage))
@@ -1658,15 +1746,19 @@ namespace Dotgame.Avalonia.Views
                         runtimePreviewStatusHintText.Text = hintMessage;
                         runtimePreviewStatusHintText.IsVisible = isVisible;
                     }
+                    else if (allowDismiss && (isError || showLoadMapButton))
+                    {
+                        runtimePreviewStatusHintText.Text = RuntimePreviewDefaultHint;
+                        runtimePreviewStatusHintText.IsVisible = true;
+                    }
                     else
                     {
-                        runtimePreviewStatusHintText.Text = "Press Esc or dismiss once you're ready.";
-                        runtimePreviewStatusHintText.IsVisible = isVisible && isError;
+                        runtimePreviewStatusHintText.IsVisible = false;
                     }
                 }
 
                 if (runtimePreviewStatusDismissButton != null)
-                    runtimePreviewStatusDismissButton.IsVisible = isVisible && (isError || showLoadMapButton);
+                    runtimePreviewStatusDismissButton.IsVisible = allowDismiss;
 
                 if (runtimePreviewStatusLoadMapButton != null)
                     runtimePreviewStatusLoadMapButton.IsVisible = isVisible && showLoadMapButton;
@@ -1685,12 +1777,14 @@ namespace Dotgame.Avalonia.Views
         private void RuntimePreviewStatusDismissButton_Click(object? sender, RoutedEventArgs e)
         {
             UpdateRuntimePreviewStatus(string.Empty, false, false);
+            runtimePreviewHost?.Focus();
         }
 
         private void RuntimePreviewStatusLoadMapButton_Click(object? sender, RoutedEventArgs e)
         {
             BtnLoadMap_Click(sender, e);
             UpdateRuntimePreviewStatus(string.Empty, false, false);
+            runtimePreviewHost?.Focus();
         }
 
         private void HookToolToggle(ToggleButton? button, EditorTool tool)
@@ -2132,6 +2226,21 @@ namespace Dotgame.Avalonia.Views
                             BtnReloadGameData_Click(sender, new RoutedEventArgs());
                             e.Handled = true;
                             return;
+                        case Key.OemPlus:
+                        case Key.Add:
+                            AdjustZoom(1.1);
+                            e.Handled = true;
+                            return;
+                        case Key.OemMinus:
+                        case Key.Subtract:
+                            AdjustZoom(0.9);
+                            e.Handled = true;
+                            return;
+                        case Key.D0:
+                        case Key.NumPad0:
+                            ResetZoom();
+                            e.Handled = true;
+                            return;
                     }
                 }
 
@@ -2163,6 +2272,97 @@ namespace Dotgame.Avalonia.Views
             if (TilesToolsPanel != null) TilesToolsPanel.IsVisible = true;
             if (CharactersToolsPanel != null) CharactersToolsPanel.IsVisible = false;
             if (DoodadsToolsPanel != null) DoodadsToolsPanel.IsVisible = false;
+        }
+
+        private void InitializeLoggingHooks()
+        {
+            if (logList != null)
+                logList.ItemsSource = logEntries;
+
+            var sink = LogManager.GetBufferedSink();
+            if (sink == null)
+                return;
+
+            foreach (var logEvent in sink.Snapshot)
+                AppendLog(logEvent);
+
+            bufferedLogHandler = (_, evt) => AppendLog(evt);
+            sink.LogReceived += bufferedLogHandler;
+
+            logger.Info("Editor window initialized.");
+        }
+
+        private void AppendLog(LogEvent logEvent)
+        {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                Dispatcher.UIThread.Post(() => AppendLog(logEvent));
+                return;
+            }
+
+            var entry = new LogEntryViewModel(logEvent);
+            logEntries.Insert(0, entry);
+            IncrementAlertCounters(logEvent.Level);
+
+            while (logEntries.Count > MaxLogEntries)
+            {
+                var removed = logEntries[^1];
+                logEntries.RemoveAt(logEntries.Count - 1);
+                DecrementAlertCounters(removed.Level);
+            }
+
+            UpdateAlertStatus();
+        }
+
+        private void IncrementAlertCounters(LogLevel level)
+        {
+            switch (level)
+            {
+                case LogLevel.Warning:
+                    warningCount++;
+                    break;
+                case LogLevel.Error:
+                case LogLevel.Critical:
+                    errorCount++;
+                    break;
+            }
+        }
+
+        private void DecrementAlertCounters(LogLevel level)
+        {
+            switch (level)
+            {
+                case LogLevel.Warning when warningCount > 0:
+                    warningCount--;
+                    break;
+                case LogLevel.Error when errorCount > 0:
+                case LogLevel.Critical when errorCount > 0:
+                    errorCount--;
+                    break;
+            }
+        }
+
+        private void UpdateAlertStatus()
+        {
+            if (statusAlertText == null)
+                return;
+
+            if (warningCount <= 0 && errorCount <= 0)
+            {
+                statusAlertText.IsVisible = false;
+                statusAlertText.Text = string.Empty;
+                return;
+            }
+
+            var segments = new List<string>(2);
+            if (errorCount > 0)
+                segments.Add($"Errors: {errorCount}");
+            if (warningCount > 0)
+                segments.Add($"Warnings: {warningCount}");
+
+            statusAlertText.Text = string.Join("   ", segments);
+            statusAlertText.Foreground = errorCount > 0 ? Brushes.DarkRed : Brushes.DarkOrange;
+            statusAlertText.IsVisible = true;
         }
 
         private void LayerList_AddMenuItem_Click(object? sender, RoutedEventArgs e)
@@ -2276,11 +2476,11 @@ namespace Dotgame.Avalonia.Views
                     spriteSheetPath = filePath;
                     activeTilesetState?.Dispose();
                     activeTilesetState = null;
-                    Console.WriteLine($"Sprite sheet loaded: {filePath}");
+                    logger.Info($"Sprite sheet loaded: {filePath}");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error loading sprite sheet: {ex.Message}");
+                    logger.Error($"Error loading sprite sheet from {filePath}.", ex);
                 }
             }
         }
@@ -2289,14 +2489,14 @@ namespace Dotgame.Avalonia.Views
         {
             if (spriteSheetImage == null)
             {
-                Console.WriteLine("Error: No sprite sheet loaded.");
+                logger.Error("No sprite sheet loaded.");
                 return;
             }
 
             if (numTileWidth == null || numTileHeight == null || 
                 numSpacing == null || numMargin == null || tilePalette == null)
             {
-                Console.WriteLine("Error: Missing UI elements for splitting parameters.");
+                logger.Error("Missing UI elements for splitting parameters.");
                 return;
             }
 
@@ -2307,7 +2507,7 @@ namespace Dotgame.Avalonia.Views
 
             if (tw <= 0 || th <= 0)
             {
-                Console.WriteLine("Error: Tile width and height must be greater than zero.");
+                logger.Error("Tile width and height must be greater than zero.");
                 return;
             }
 
@@ -2322,7 +2522,7 @@ namespace Dotgame.Avalonia.Views
 
             if (cols <= 0 || rows <= 0)
             {
-                Console.WriteLine("Error: Invalid tile dimensions or parameters. No tiles can be generated.");
+                logger.Error("Invalid tile dimensions or parameters. No tiles can be generated.");
                 return;
             }
 
@@ -2345,18 +2545,18 @@ namespace Dotgame.Avalonia.Views
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Failed to generate tile {tileId}: {ex.Message}");
+                    logger.Error($"Failed to generate tile {tileId}.", ex);
                 }
             }
 
             if (tiles.Count > 0)
             {
                 selectedTile = tiles[0];
-                Console.WriteLine($"Successfully split sprite sheet into {tiles.Count} tiles.");
+                logger.Info($"Successfully split sprite sheet into {tiles.Count} tiles.");
             }
             else
             {
-                Console.WriteLine("Error: No tiles generated from sprite sheet.");
+                logger.Error("No tiles generated from sprite sheet.");
             }
         }
 
@@ -2510,7 +2710,8 @@ namespace Dotgame.Avalonia.Views
                 var path = file.Path?.LocalPath;
                 if (string.IsNullOrWhiteSpace(path))
                 {
-                    Console.WriteLine("Error: Unable to resolve the selected save path.");
+                    logger.Error("Unable to resolve the selected save path.");
+                    PushHistory("Unable to resolve the selected save path.");
                     return;
                 }
 
@@ -2607,11 +2808,13 @@ namespace Dotgame.Avalonia.Views
 
                 var options = new JsonSerializerOptions { WriteIndented = true };
                 System.IO.File.WriteAllText(path, JsonSerializer.Serialize(mapObject, options));
-                Console.WriteLine($"Map saved to {path}.");
+                logger.Info($"Map saved to {path}.");
+                PushHistory($"Map saved to '{path}'.");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error saving map: {ex.Message}");
+                logger.Error($"Error saving map.", ex);
+                PushHistory($"Error saving map: {ex.Message}");
             }
         }
 
@@ -2649,7 +2852,7 @@ namespace Dotgame.Avalonia.Views
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Warning: Failed to cache tileset tile {tileId}: {ex.Message}");
+                        logger.Warn($"Failed to cache tileset tile {tileId}.", ex);
                     }
                 }
 
@@ -2658,7 +2861,8 @@ namespace Dotgame.Avalonia.Views
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Warning: Unable to load tileset '{reference.TextureKey}': {ex.Message}");
+                logger.Warn($"Unable to load tileset '{reference.TextureKey}'.", ex);
+                PushHistory($"Unable to load tileset '{reference.TextureKey}': {ex.Message}");
                 activeTilesetState?.Dispose();
                 activeTilesetState = null;
             }
@@ -2685,7 +2889,8 @@ namespace Dotgame.Avalonia.Views
                 var path = results[0].Path?.LocalPath;
                 if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
                 {
-                    Console.WriteLine("Error: Selected map file could not be resolved.");
+                    logger.Error("Selected map file could not be resolved.");
+                    PushHistory("Selected map file could not be resolved.");
                     return;
                 }
 
@@ -2771,12 +2976,13 @@ namespace Dotgame.Avalonia.Views
 
                 SyncMapFromEditorState();
                 RenderMap();
-                Console.WriteLine($"Loaded map from {path}.");
+                logger.Info($"Loaded map from {path}.");
                 PushHistory($"Loaded map '{IOPath.GetFileName(path)}'");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error loading map: {ex.Message}");
+                logger.Error("Failed to load map from selection.", ex);
+                PushHistory($"Failed to load map: {ex.Message}");
             }
         }
 
@@ -2889,7 +3095,11 @@ namespace Dotgame.Avalonia.Views
                     if (erase)
                     {
                         if (!RemoveTriggerAt(gridX, gridY))
-                            Console.WriteLine($"No trigger present at ({gridX}, {gridY}).");
+                        {
+                            var message = $"No trigger present at ({gridX}, {gridY}).";
+                            logger.Info(message);
+                            PushHistory(message);
+                        }
                     }
                     else if (primaryPressed)
                     {
@@ -2900,11 +3110,15 @@ namespace Dotgame.Avalonia.Views
                             {
                                 selectedTrigger = existingTrigger;
                                 SelectTriggerInList(existingTrigger);
-                                Console.WriteLine($"Selected trigger '{existingTrigger.Name}' at ({gridX}, {gridY}).");
+                                var message = $"Selected trigger '{existingTrigger.Name}' at ({gridX}, {gridY}).";
+                                logger.Info(message);
+                                PushHistory(message);
                             }
                             else
                             {
-                                Console.WriteLine("No trigger template selected. Use Add Trigger to create one.");
+                                const string message = "No trigger template selected. Use Add Trigger to create one.";
+                                logger.Info(message);
+                                PushHistory(message);
                             }
                         }
                         else
@@ -2923,7 +3137,9 @@ namespace Dotgame.Avalonia.Views
         {
             if (!erase && selectedTile == null)
             {
-                Console.WriteLine("Select a tile from the palette before painting.");
+                const string message = "Select a tile from the palette before painting.";
+                logger.Info(message);
+                PushHistory(message);
                 return;
             }
 
@@ -2950,7 +3166,9 @@ namespace Dotgame.Avalonia.Views
         {
             if (selectedTile == null)
             {
-                Console.WriteLine("Select a tile before using the fill tool.");
+                const string message = "Select a tile before using the fill tool.";
+                logger.Info(message);
+                PushHistory(message);
                 return;
             }
 
@@ -3000,7 +3218,9 @@ namespace Dotgame.Avalonia.Views
             {
                 if (!RemoveCharacterAt(tileX, tileY))
                 {
-                    Console.WriteLine($"No character present at ({tileX}, {tileY}).");
+                    var message = $"No character present at ({tileX}, {tileY}).";
+                    logger.Info(message);
+                    PushHistory(message);
                 }
                 return;
             }
@@ -3011,12 +3231,16 @@ namespace Dotgame.Avalonia.Views
                 if (existing != null)
                 {
                     selectedCharacter = existing;
-                    Console.WriteLine($"Selected character {existing.Name} at ({tileX}, {tileY}).");
+                    var message = $"Selected character {existing.Name} at ({tileX}, {tileY}).";
+                    logger.Info(message);
+                    PushHistory(message);
                     SelectCharacterInList(existing);
                 }
                 else
                 {
-                    Console.WriteLine("No character template selected. Use Add Character to create one.");
+                    const string message = "No character template selected. Use Add Character to create one.";
+                    logger.Info(message);
+                    PushHistory(message);
                 }
                 return;
             }
@@ -3029,7 +3253,9 @@ namespace Dotgame.Avalonia.Views
             characters.Add(placement);
             selectedCharacter = placement;
             SelectCharacterInList(placement);
-            Console.WriteLine($"Placed character {placement.Name} at ({tileX}, {tileY}).");
+            var confirmation = $"Placed character {placement.Name} at ({tileX}, {tileY}).";
+            logger.Info(confirmation);
+            PushHistory(confirmation);
         }
 
         private void HandleDoodadPlacement(int tileX, int tileY, bool erase)
@@ -3038,7 +3264,9 @@ namespace Dotgame.Avalonia.Views
             {
                 if (!RemoveDoodadAt(tileX, tileY))
                 {
-                    Console.WriteLine($"No doodad present at ({tileX}, {tileY}).");
+                    var message = $"No doodad present at ({tileX}, {tileY}).";
+                    logger.Info(message);
+                    PushHistory(message);
                 }
                 return;
             }
@@ -3049,12 +3277,16 @@ namespace Dotgame.Avalonia.Views
                 if (existing != null)
                 {
                     selectedDoodad = existing;
-                    Console.WriteLine($"Selected doodad {existing.Type} at ({tileX}, {tileY}).");
+                    var message = $"Selected doodad {existing.Type} at ({tileX}, {tileY}).";
+                    logger.Info(message);
+                    PushHistory(message);
                     SelectDoodadInList(existing);
                 }
                 else
                 {
-                    Console.WriteLine("No doodad template selected. Use Add Doodad to create one.");
+                    const string message = "No doodad template selected. Use Add Doodad to create one.";
+                    logger.Info(message);
+                    PushHistory(message);
                 }
                 return;
             }
@@ -3067,7 +3299,9 @@ namespace Dotgame.Avalonia.Views
             doodads.Add(placement);
             selectedDoodad = placement;
             SelectDoodadInList(placement);
-            Console.WriteLine($"Placed doodad {placement.Type} at ({tileX}, {tileY}).");
+            var confirmation = $"Placed doodad {placement.Type} at ({tileX}, {tileY}).";
+            logger.Info(confirmation);
+            PushHistory(confirmation);
         }
 
         private Character? GetCharacterAt(int tileX, int tileY)
@@ -3488,14 +3722,18 @@ namespace Dotgame.Avalonia.Views
                     selectedTileBorder = border;
                 }
             }
-            Console.WriteLine("Tile painting mode enabled. Select a tile from the palette to change the brush.");
+            const string paintModeMessage = "Tile painting mode enabled. Select a tile from the palette to change the brush.";
+            logger.Info(paintModeMessage);
+            PushHistory(paintModeMessage);
         }
 
         private void BtnTileFill_Click(object? sender, RoutedEventArgs e)
         {
             if (selectedTile == null)
             {
-                Console.WriteLine("Select a tile before using Fill Area.");
+                const string message = "Select a tile before using Fill Area.";
+                logger.Info(message);
+                PushHistory(message);
                 return;
             }
 
@@ -3510,7 +3748,9 @@ namespace Dotgame.Avalonia.Views
             }
 
             RenderMap();
-            Console.WriteLine("Filled the entire map with the current tile selection.");
+            const string fillMessage = "Filled the entire map with the current tile selection.";
+            logger.Info(fillMessage);
+            PushHistory(fillMessage);
             SyncMapFromEditorState();
         }
 
@@ -3522,14 +3762,18 @@ namespace Dotgame.Avalonia.Views
 
             pendingCharacterTemplate = CloneCharacterTemplate(template);
             SwitchToCharactersMode(sender, e);
-            Console.WriteLine("Character template ready. Left click on the map to place it.");
+            const string readyCharacterMessage = "Character template ready. Left click on the map to place it.";
+            logger.Info(readyCharacterMessage);
+            PushHistory(readyCharacterMessage);
         }
 
         private async void BtnEditCharacter_Click(object? sender, RoutedEventArgs e)
         {
             if (characters.Count == 0)
             {
-                Console.WriteLine("There are no characters to edit.");
+                const string message = "There are no characters to edit.";
+                logger.Info(message);
+                PushHistory(message);
                 return;
             }
 
@@ -3541,7 +3785,9 @@ namespace Dotgame.Avalonia.Views
                 characters.Remove(target);
                 if (ReferenceEquals(selectedCharacter, target))
                     selectedCharacter = null;
-                Console.WriteLine($"Deleted character {target.Name}.");
+                var message = $"Deleted character {target.Name}.";
+                logger.Info(message);
+                PushHistory(message);
                 SelectCharacterInList(null);
             }
             else if (updated != null)
@@ -3551,7 +3797,9 @@ namespace Dotgame.Avalonia.Views
                 {
                     characters[index] = updated;
                     selectedCharacter = updated;
-                    Console.WriteLine($"Updated character {updated.Name}.");
+                    var message = $"Updated character {updated.Name}.";
+                    logger.Info(message);
+                    PushHistory(message);
                     SelectCharacterInList(updated);
                 }
             }
@@ -3568,14 +3816,18 @@ namespace Dotgame.Avalonia.Views
 
             pendingDoodadTemplate = CloneDoodadTemplate(doodad);
             SwitchToDoodadsMode(sender, e);
-            Console.WriteLine("Doodad template ready. Left click on the map to place it.");
+            const string readyDoodadMessage = "Doodad template ready. Left click on the map to place it.";
+            logger.Info(readyDoodadMessage);
+            PushHistory(readyDoodadMessage);
         }
 
         private async void BtnEditDoodad_Click(object? sender, RoutedEventArgs e)
         {
             if (doodads.Count == 0)
             {
-                Console.WriteLine("There are no doodads to edit.");
+                const string message = "There are no doodads to edit.";
+                logger.Info(message);
+                PushHistory(message);
                 return;
             }
 
@@ -3587,7 +3839,9 @@ namespace Dotgame.Avalonia.Views
                 doodads.Remove(target);
                 if (ReferenceEquals(selectedDoodad, target))
                     selectedDoodad = null;
-                Console.WriteLine($"Deleted doodad {target.Type}.");
+                var message = $"Deleted doodad {target.Type}.";
+                logger.Info(message);
+                PushHistory(message);
                 SelectDoodadInList(null);
             }
             else if (updated != null)
@@ -3599,7 +3853,9 @@ namespace Dotgame.Avalonia.Views
                 {
                     doodads[index] = updated;
                     selectedDoodad = updated;
-                    Console.WriteLine($"Updated doodad {updated.Type}.");
+                    var message = $"Updated doodad {updated.Type}.";
+                    logger.Info(message);
+                    PushHistory(message);
                     SelectDoodadInList(updated);
                 }
             }
@@ -3616,14 +3872,18 @@ namespace Dotgame.Avalonia.Views
 
             pendingTriggerTemplate = template;
             SwitchToTriggersMode(sender, e ?? new RoutedEventArgs());
-            Console.WriteLine($"Trigger template '{template.Name}' ready. Left click on the map to place it.");
+            var message = $"Trigger template '{template.Name}' ready. Left click on the map to place it.";
+            logger.Info(message);
+            PushHistory(message);
         }
 
         private void BtnRemoveTrigger_Click(object? sender, RoutedEventArgs e)
         {
             if (selectedTrigger == null)
             {
-                Console.WriteLine("Select a trigger to remove.");
+                const string message = "Select a trigger to remove.";
+                logger.Info(message);
+                PushHistory(message);
                 return;
             }
 
@@ -3868,7 +4128,8 @@ namespace Dotgame.Avalonia.Views
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"MonoGame preview sync error: {ex.Message}");
+                logger.Error("MonoGame preview sync error.", ex);
+                PushHistory($"MonoGame preview sync error: {ex.Message}");
                 UpdateRuntimePreviewStatus($"Preview update failed.\n{ex.Message}", true, true);
             }
         }
@@ -3884,7 +4145,7 @@ namespace Dotgame.Avalonia.Views
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error converting Bitmap to SKBitmap: {ex.Message}");
+                logger.Error("Error converting Bitmap to SKBitmap.", ex);
                 throw;
             }
         }
@@ -3933,14 +4194,18 @@ namespace Dotgame.Avalonia.Views
         {
             if (!map.InBounds(tileX, tileY))
             {
-                Console.WriteLine("Character placement out of bounds.");
+                const string outOfBoundsMessage = "Character placement out of bounds.";
+                logger.Warn(outOfBoundsMessage);
+                PushHistory(outOfBoundsMessage);
                 return;
             }
 
             character.TileX = tileX;
             character.TileY = tileY;
             characters.Add(character);
-            Console.WriteLine($"Placed character {character.Name} at ({tileX}, {tileY}).");
+            var placementMessage = $"Placed character {character.Name} at ({tileX}, {tileY}).";
+            logger.Info(placementMessage);
+            PushHistory(placementMessage);
             SelectCharacterInList(character);
         }
 
@@ -3953,7 +4218,9 @@ namespace Dotgame.Avalonia.Views
                     selectedCharacter = null;
                     SelectCharacterInList(null);
                 }
-                Console.WriteLine($"Removed character {character.Name}.");
+                var removalMessage = $"Removed character {character.Name}.";
+                logger.Info(removalMessage);
+                PushHistory(removalMessage);
             }
         }
 
@@ -3961,14 +4228,18 @@ namespace Dotgame.Avalonia.Views
         {
             if (!map.InBounds(tileX, tileY))
             {
-                Console.WriteLine("Doodad placement out of bounds.");
+                const string outOfBoundsMessage = "Doodad placement out of bounds.";
+                logger.Warn(outOfBoundsMessage);
+                PushHistory(outOfBoundsMessage);
                 return;
             }
 
             doodad.TileX = tileX;
             doodad.TileY = tileY;
             doodads.Add(doodad);
-            Console.WriteLine($"Placed doodad {doodad.Type} at ({tileX}, {tileY}).");
+            var placementMessage = $"Placed doodad {doodad.Type} at ({tileX}, {tileY}).";
+            logger.Info(placementMessage);
+            PushHistory(placementMessage);
             SelectDoodadInList(doodad);
         }
 
@@ -3981,7 +4252,9 @@ namespace Dotgame.Avalonia.Views
                     selectedDoodad = null;
                     SelectDoodadInList(null);
                 }
-                Console.WriteLine($"Removed doodad {doodad.Type}.");
+                var removalMessage = $"Removed doodad {doodad.Type}.";
+                logger.Info(removalMessage);
+                PushHistory(removalMessage);
             }
         }
 
@@ -3989,7 +4262,9 @@ namespace Dotgame.Avalonia.Views
         {
             if (!map.InBounds(tileX, tileY))
             {
-                Console.WriteLine("Trigger placement out of bounds.");
+                const string outOfBoundsMessage = "Trigger placement out of bounds.";
+                logger.Warn(outOfBoundsMessage);
+                PushHistory(outOfBoundsMessage);
                 return;
             }
 
@@ -4007,7 +4282,8 @@ namespace Dotgame.Avalonia.Views
             triggers.Add(trigger);
             selectedTrigger = trigger;
             SelectTriggerInList(trigger);
-            Console.WriteLine($"Added behavior trigger '{triggerName}' at ({tileX}, {tileY}).");
+            var addedTriggerMessage = $"Added behavior trigger '{triggerName}' at ({tileX}, {tileY}).";
+            logger.Info(addedTriggerMessage);
             PushHistory($"Added trigger '{triggerName}' at ({tileX}, {tileY})");
             RenderMap();
             SyncMapFromEditorState();
@@ -4017,7 +4293,9 @@ namespace Dotgame.Avalonia.Views
         {
             if (!triggers.Remove(trigger))
             {
-                Console.WriteLine($"Trigger '{trigger.Name}' not found.");
+                var notFoundMessage = $"Trigger '{trigger.Name}' not found.";
+                logger.Warn(notFoundMessage);
+                PushHistory(notFoundMessage);
                 return;
             }
 
@@ -4027,7 +4305,8 @@ namespace Dotgame.Avalonia.Views
                 SelectTriggerInList(null);
             }
 
-            Console.WriteLine($"Removed behavior trigger '{trigger.Name}'.");
+            var removalMessage = $"Removed behavior trigger '{trigger.Name}'.";
+            logger.Info(removalMessage);
             PushHistory($"Removed trigger '{trigger.Name}'");
             RenderMap();
             SyncMapFromEditorState();
