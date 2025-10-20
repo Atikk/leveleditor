@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using global::Avalonia.Media;
 using DotGame.Core.Async;
 using DotGame.Core.Resources;
+using DotGame.Core.Async.Jobs;
 using DotGame.Runtime.Content;
 using DotGame.Runtime.Rendering;
 using Dotgame.Avalonia.Engine;
@@ -26,6 +27,8 @@ namespace Dotgame.Avalonia.MonoGameLayer
 		private readonly ResourceManager _resourceManager;
 		private readonly bool _ownsScheduler;
 		private readonly bool _ownsResourceManager;
+		private readonly IJobSystem _jobSystem;
+		private readonly bool _ownsJobSystem;
 		private readonly object _mapLock = new();
 
 		private Map _map = null!;
@@ -76,7 +79,7 @@ namespace Dotgame.Avalonia.MonoGameLayer
 
 		public event Action<BehaviorTrigger, Entity>? TriggerActivated;
 
-		public EditorGame(Map map, ITextureResolver? resolverOverride = null, AsyncTaskScheduler? schedulerOverride = null, ResourceManager? resourceManagerOverride = null)
+		public EditorGame(Map map, ITextureResolver? resolverOverride = null, AsyncTaskScheduler? schedulerOverride = null, ResourceManager? resourceManagerOverride = null, IJobSystem? jobSystemOverride = null)
 		{
 			_map = map ?? throw new ArgumentNullException(nameof(map));
 			_resolverOverride = resolverOverride;
@@ -97,6 +100,8 @@ namespace Dotgame.Avalonia.MonoGameLayer
 
 			_scheduler = schedulerOverride ?? new AsyncTaskScheduler(workerCount: 1, workerNamePrefix: "EditorGameWorker-");
 			_resourceManager = resourceManagerOverride ?? new ResourceManager(_scheduler);
+			_jobSystem = jobSystemOverride ?? new AsyncTaskJobSystem(workerCount: 1, workerNamePrefix: "EditorJob-");
+			_ownsJobSystem = jobSystemOverride == null;
 			_ownsScheduler = schedulerOverride == null;
 			_ownsResourceManager = resourceManagerOverride == null;
 
@@ -216,10 +221,17 @@ namespace Dotgame.Avalonia.MonoGameLayer
 				{
 					_scheduler.Dispose();
 				}
+
+				if (_ownsJobSystem)
+				{
+					_jobSystem.Dispose();
+				}
 			}
 
 			base.Dispose(disposing);
 		}
+
+			public IJobSystem JobSystem => _jobSystem;
 
 		public void RequestMapSwap(Map mapSnapshot)
 		{

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using DotGame.Core.Entities;
 using DotGame.Core.States;
+using DotGame.Core.Memory;
 using DotGame.Runtime.Components;
 using DotGame.Runtime.Content;
 using DotGame.Runtime.Rendering;
@@ -12,6 +13,7 @@ using DotGame.Runtime.Systems;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using MonoGame.Extended;
+using System.Runtime.InteropServices;
 using TiledCS;
 
 namespace DotGame.Runtime.Scenes;
@@ -26,7 +28,8 @@ public sealed class GameplayState : GameStateBase
     private readonly RuntimeContext _runtime;
     private readonly EntityWorld _world;
     private readonly GameplayCollisionWorld _collisionWorld;
-    private readonly List<RectangleF> _colliders = new();
+    private readonly List<RectangleF> _colliderScratch = new();
+    private AllocatorBackedList<RectangleF>? _colliders;
     private readonly List<IRuntimeEntitySystem> _runtimeSystems = new();
 
     private RuntimeTiledMap? _map;
@@ -93,6 +96,7 @@ public sealed class GameplayState : GameStateBase
         base.OnExit();
         DisposeMap();
         _world.ClearEntities();
+        DisposeColliders();
         _playerSpriteTexture?.Dispose();
         _playerSpriteTexture = null;
     }
@@ -144,7 +148,8 @@ public sealed class GameplayState : GameStateBase
     private void InitializeWorldState()
     {
         _world.ClearEntities();
-        _colliders.Clear();
+        _colliderScratch.Clear();
+        DisposeColliders();
 
         if (_map != null)
         {
@@ -155,6 +160,8 @@ public sealed class GameplayState : GameStateBase
         {
             BuildFallbackEnvironment();
         }
+
+        CommitColliders();
 
         _playerSpawn = ClampPositionToWorld(_playerSpawn);
 
@@ -230,7 +237,7 @@ public sealed class GameplayState : GameStateBase
                 {
                     var position = new Vector2(mapObject.x, mapObject.y);
                     var size = new Vector2(mapObject.width, mapObject.height);
-                    _colliders.Add(new RectangleF(position, size));
+                    _colliderScratch.Add(new RectangleF(position, size));
                 }
             }
         }
@@ -273,13 +280,13 @@ public sealed class GameplayState : GameStateBase
         _worldBounds = new RectangleF(-arenaSize * 0.5f, -arenaSize * 0.5f, arenaSize, arenaSize);
 
         var bounds = _worldBounds;
-        _colliders.Add(new RectangleF(bounds.X - wallThickness, bounds.Y - wallThickness, bounds.Width + wallThickness * 2f, wallThickness));
-        _colliders.Add(new RectangleF(bounds.X - wallThickness, bounds.Bottom, bounds.Width + wallThickness * 2f, wallThickness));
-        _colliders.Add(new RectangleF(bounds.X - wallThickness, bounds.Y, wallThickness, bounds.Height));
-        _colliders.Add(new RectangleF(bounds.Right, bounds.Y, wallThickness, bounds.Height));
+    _colliderScratch.Add(new RectangleF(bounds.X - wallThickness, bounds.Y - wallThickness, bounds.Width + wallThickness * 2f, wallThickness));
+    _colliderScratch.Add(new RectangleF(bounds.X - wallThickness, bounds.Bottom, bounds.Width + wallThickness * 2f, wallThickness));
+    _colliderScratch.Add(new RectangleF(bounds.X - wallThickness, bounds.Y, wallThickness, bounds.Height));
+    _colliderScratch.Add(new RectangleF(bounds.Right, bounds.Y, wallThickness, bounds.Height));
 
-        _colliders.Add(new RectangleF(bounds.X + 96f, bounds.Y + 96f, 128f, 32f));
-        _colliders.Add(new RectangleF(bounds.X + 64f, bounds.Bottom - 160f, 192f, 32f));
+    _colliderScratch.Add(new RectangleF(bounds.X + 96f, bounds.Y + 96f, 128f, 32f));
+    _colliderScratch.Add(new RectangleF(bounds.X + 64f, bounds.Bottom - 160f, 192f, 32f));
         _playerSpawn = new Vector2(bounds.X + bounds.Width * 0.5f, bounds.Y + bounds.Height * 0.5f) - _playerSize * 0.5f;
     }
 
@@ -338,6 +345,27 @@ public sealed class GameplayState : GameStateBase
         _map = null;
     }
 
+    private void CommitColliders()
+    {
+        _colliders?.Dispose();
+
+        if (_colliderScratch.Count == 0)
+        {
+            _colliders = null;
+            return;
+        }
+
+        var source = CollectionsMarshal.AsSpan(_colliderScratch);
+        _colliders = AllocatorBackedList<RectangleF>.FromArena(_runtime.Allocators.Arena, source);
+        _colliderScratch.Clear();
+    }
+
+    private void DisposeColliders()
+    {
+        _colliders?.Dispose();
+        _colliders = null;
+    }
+
     private sealed class GameplayCollisionWorld : ICollisionWorld
     {
         private readonly GameplayState _owner;
@@ -349,6 +377,13 @@ public sealed class GameplayState : GameStateBase
 
         public RectangleF WorldBounds => _owner._worldBounds;
 
-        public IReadOnlyList<RectangleF> StaticColliders => _owner._colliders;
+        public IReadOnlyList<RectangleF> StaticColliders
+        {
+            get
+            {
+                var colliders = _owner._colliders;
+                return colliders ?? (IReadOnlyList<RectangleF>)Array.Empty<RectangleF>();
+            }
+        }
     }
 }

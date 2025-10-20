@@ -1,0 +1,114 @@
+name: Deterministic Telemetry Sweep
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  id-token: write
+
+jobs:
+  sweep:
+    name: Run deterministic telemetry sweep
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      TELEMETRY_OUTPUT_ROOT: telemetry-runs
+      TELEMETRY_SESSION_PREFIX: ci-${{ github.run_id }}-${{ github.run_attempt }}
+      TELEMETRY_WORKERS: 2,4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Restore solution
+        run: dotnet restore leveleditor.sln
+
+      - name: Build solution (Release)
+        run: dotnet build leveleditor.sln --configuration Release --no-restore
+
+      - name: Run telemetry sweep
+        shell: pwsh
+        run: |
+          $outputRoot = Join-Path $PWD $env:TELEMETRY_OUTPUT_ROOT
+          $sessionPrefix = $env:TELEMETRY_SESSION_PREFIX
+          $workersRaw = $env:TELEMETRY_WORKERS
+          if ([string]::IsNullOrWhiteSpace($workersRaw)) {
+            $workerArgs = @(4)
+          } else {
+            $workerArgs = @()
+            foreach ($entry in ($workersRaw -split '[,; ]+' | Where-Object { $_ -ne '' })) {
+              $parsed = 0
+              if ([int]::TryParse($entry, [ref]$parsed)) {
+                $workerArgs += $parsed
+              } else {
+                Write-Warning "Skipping invalid worker entry '$entry'"
+              }
+            }
+            if ($workerArgs.Count -eq 0) {
+              $workerArgs = @(4)
+            }
+          }
+          Write-Host "Telemetry output root: $outputRoot"
+          Write-Host "Session prefix: $sessionPrefix"
+          Write-Host ("Worker counts: " + ($workerArgs -join ', '))
+          ./scripts/collect-job-system-telemetry.ps1 `
+            -OutputRoot $outputRoot `
+            -SessionPrefix $sessionPrefix `
+            -Workers $workerArgs `
+            -Configuration Release `
+            -NoBuild
+
+      - name: Analyse telemetry
+        shell: pwsh
+        run: |
+          $outputRoot = Join-Path $PWD $env:TELEMETRY_OUTPUT_ROOT
+          $summaryPath = Join-Path $outputRoot "summary.json"
+          $baselinePath = Join-Path $PWD "ci/telemetry-baseline.json"
+          $arguments = @($outputRoot, "--json", $summaryPath)
+          if (Test-Path $baselinePath) {
+            Write-Host "Using telemetry baseline at $baselinePath"
+            $arguments += @("--baseline", $baselinePath, "--fail-on-regression", "--regression-tolerance", "0.05")
+          } else {
+            Write-Host "No telemetry baseline found at $baselinePath; skipping regression gating."
+          }
+          python ./scripts/analyze-job-system-telemetry.py @arguments
+
+      - name: Publish job summary
+        shell: pwsh
+        run: |
+          $outputRoot = Join-Path $PWD $env:TELEMETRY_OUTPUT_ROOT
+          $summaryPath = Join-Path $outputRoot "summary.json"
+          if (Test-Path $summaryPath) {
+            $json = Get-Content $summaryPath -Raw
+            $header = "## Job System Telemetry Summary" + [Environment]::NewLine
+            $codeFenceStart = "```json" + [Environment]::NewLine
+            $codeFenceEnd = [Environment]::NewLine + "```" + [Environment]::NewLine
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ($header + $codeFenceStart + $json + $codeFenceEnd)
+          } else {
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## Job System Telemetry Summary`nNo summary.json generated."
+          }
+
+      - name: Upload telemetry artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deterministic-telemetry-${{ github.run_id }}
+          path: ${{ env.TELEMETRY_OUTPUT_ROOT }}
+          if-no-files-found: error

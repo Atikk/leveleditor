@@ -9,6 +9,9 @@ namespace Dotgame.Avalonia;
 internal static class LoggingBootstrapper
 {
     private static bool initialized;
+    private static BufferedLogSink? sharedBuffer;
+
+    public static BufferedLogSink? BufferedSink => sharedBuffer;
 
     public static IDisposable Initialize()
     {
@@ -18,8 +21,9 @@ internal static class LoggingBootstrapper
         var disposables = new List<IDisposable>();
         var sinks = new List<ILogSink>();
 
-        var bufferSink = new BufferedLogSink(500);
+    var bufferSink = new BufferedLogSink(500);
         sinks.Add(bufferSink);
+    sharedBuffer = bufferSink;
 
         var consoleSink = new ConsoleLogSink();
         sinks.Add(consoleSink);
@@ -51,8 +55,9 @@ internal static class LoggingBootstrapper
         AppDomain.CurrentDomain.UnhandledException += AppDomainUnhandled;
         TaskScheduler.UnobservedTaskException += TaskSchedulerUnhandled;
 
-        disposables.Add(new CallbackDisposable(() => AppDomain.CurrentDomain.UnhandledException -= AppDomainUnhandled));
-        disposables.Add(new CallbackDisposable(() => TaskScheduler.UnobservedTaskException -= TaskSchedulerUnhandled));
+    disposables.Add(new CallbackDisposable(() => AppDomain.CurrentDomain.UnhandledException -= AppDomainUnhandled));
+    disposables.Add(new CallbackDisposable(() => TaskScheduler.UnobservedTaskException -= TaskSchedulerUnhandled));
+    disposables.Add(new CallbackDisposable(() => sharedBuffer = null));
 
         initialized = true;
 

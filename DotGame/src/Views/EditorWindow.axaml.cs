@@ -27,10 +27,12 @@ using Dotgame.Avalonia.Models;
 using Dotgame.Avalonia.Controls;
 using global::Avalonia.Threading;
 using DotGame.Core.Async;
+using DotGame.Core.Async.Jobs;
 using DotGame.Core.Logging;
 using DotGame.Core.Resources;
 using Dotgame.Avalonia.MonoGameLayer;
 using Dotgame.Avalonia.Services;
+using DotGame.Runtime.Services;
 using GameDataEntrySummary = Dotgame.Avalonia.Services.GameDataPreviewService.GameDataEntrySummary;
 using SkiaSharp;
 using IOPath = System.IO.Path;
@@ -486,7 +488,9 @@ namespace Dotgame.Avalonia.Views
         private Border? selectedTileBorder;
     private EditorGame? previewGame;
     private readonly object previewGameLock = new();
-        private readonly AsyncTaskScheduler scheduler = new(workerCount: 2, workerNamePrefix: "EditorWorker-");
+        private readonly AsyncTaskScheduler scheduler;
+        private readonly IJobSystem jobSystem;
+        private readonly RuntimeJobSystemFactory.JobSystemActivation jobSystemActivation;
         private readonly ResourceManager resourceManager;
         private readonly GameDataPreviewService gameDataPreviewService;
         private readonly DispatcherTimer resourcePumpTimer;
@@ -1051,8 +1055,21 @@ namespace Dotgame.Avalonia.Views
 
         public EditorWindow()
         {
+            jobSystemActivation = RuntimeJobSystemFactory.CreateFromEnvironment();
+            jobSystem = jobSystemActivation.JobSystem;
+            var requested = string.IsNullOrWhiteSpace(jobSystemActivation.Requested) ? "default" : jobSystemActivation.Requested;
+            logger.Info($"Job system selection -> requested='{requested}', resolved='{jobSystemActivation.Resolved}', workers={jobSystemActivation.WorkerCount}.");
+            if (jobSystemActivation.UsedFallback)
+            {
+                var warning = $"Unknown job system identifier '{requested}'. Falling back to '{jobSystemActivation.Resolved}'.";
+                logger.Warn(warning);
+                PushHistory(warning);
+            }
+
+            scheduler = new AsyncTaskScheduler(workerCount: Math.Max(1, jobSystemActivation.WorkerCount), workerNamePrefix: "EditorWorker-");
             resourceManager = new ResourceManager(scheduler);
             scheduler.UnhandledException += ex => Dispatcher.UIThread.Post(() => PushHistory($"Scheduler error: {ex.Message}"));
+            PushHistory($"Job system active -> {jobSystemActivation.Resolved} (workers={jobSystemActivation.WorkerCount}).");
             gameDataPreviewService = new GameDataPreviewService(resourceManager);
             resourcePumpHandler = (_, _) =>
             {
@@ -1364,6 +1381,7 @@ namespace Dotgame.Avalonia.Views
 
             resourceManager.Dispose();
             scheduler.Dispose();
+            jobSystem.Dispose();
 
             base.OnClosed(e);
         }
@@ -1696,7 +1714,7 @@ namespace Dotgame.Avalonia.Views
 
         private EditorGame CreateEditorPreviewGame(Map mapSnapshot)
         {
-            var editorGame = new EditorGame(mapSnapshot, resolverOverride: null, schedulerOverride: scheduler, resourceManagerOverride: resourceManager);
+            var editorGame = new EditorGame(mapSnapshot, resolverOverride: null, schedulerOverride: scheduler, resourceManagerOverride: resourceManager, jobSystemOverride: jobSystem);
             LogPreviewStatus("EditorGame instance created for runtime preview.");
             editorGame.TriggerActivated += (trigger, entity) =>
             {

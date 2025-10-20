@@ -35,6 +35,8 @@ public sealed class AsyncTaskScheduler : IDisposable
 
     public event Action<Exception>? UnhandledException;
 
+    public int WorkerCount => _workers.Count;
+
     public void Enqueue(Action<CancellationToken> work, Action? onCompleted = null, Action<Exception>? onError = null)
     {
         if (work == null)

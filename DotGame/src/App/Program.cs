@@ -1,5 +1,8 @@
-﻿using global::Avalonia;
-using System;
+﻿using System;
+using DotGame.Core.Platform;
+using DotGame.Core.Timing;
+using DotGame.Runtime.Platform;
+using global::Avalonia;
 
 namespace Dotgame.Avalonia;
 
@@ -11,6 +14,8 @@ class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        EnsurePlatformServices();
+
         using var logging = LoggingBootstrapper.Initialize();
         BuildAvaloniaApp()
             .StartWithClassicDesktopLifetime(args);
@@ -22,6 +27,16 @@ class Program
             .UsePlatformDetect()
             .WithInterFont()
             .LogToTrace();
+
+    private static void EnsurePlatformServices()
+    {
+        if (PlatformServices.IsInitialized)
+            return;
+
+        var services = new WindowsPlatformServices();
+        PlatformServices.Initialize(services);
+        TimeSource.Initialize(services.TimeSource);
+    }
 }
 
 

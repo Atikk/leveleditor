@@ -1,0 +1,172 @@
+{
+  "exportedAt": "2025-10-20T05:47:51.7451521+00:00",
+  "frames": [
+    {
+      "frameIndex": 0,
+      "timestamp": "2025-10-20T05:47:51.5080862+00:00",
+      "targetFrameTimeMilliseconds": 16.6666,
+      "actualFrameTimeMilliseconds": 2.0447,
+      "driftMilliseconds": 0.0234,
+      "fixedStepCount": 0,
+      "budgetExceeded": false,
+      "isBudgetEvent": false
+    },
+    {
+      "frameIndex": 1,
+      "timestamp": "2025-10-20T05:47:51.5658174+00:00",
+      "targetFrameTimeMilliseconds": 16.6666,
+      "actualFrameTimeMilliseconds": 37.2393,
+      "driftMilliseconds": 3.1828,
+      "fixedStepCount": 1,
+      "budgetExceeded": true,
+      "isBudgetEvent": true
+    },
+    {
+      "frameIndex": 1,
+      "timestamp": "2025-10-20T05:47:51.5658801+00:00",
+      "targetFrameTimeMilliseconds": 16.6666,
+      "actualFrameTimeMilliseconds": 37.2393,
+      "driftMilliseconds": 3.1828,
+      "fixedStepCount": 1,
+      "budgetExceeded": true,
+      "isBudgetEvent": false
+    },
+    {
+      "frameIndex": 2,
+      "timestamp": "2025-10-20T05:47:51.5666584+00:00",
+      "targetFrameTimeMilliseconds": 16.6666,
+      "actualFrameTimeMilliseconds": 0.7604,
+      "driftMilliseconds": 14.9316,
+      "fixedStepCount": 2,
+      "budgetExceeded": false,
+      "isBudgetEvent": false
+    },
+    {
+      "frameIndex": 3,
+      "timestamp": "2025-10-20T05:47:51.5687109+00:00",
+      "targetFrameTimeMilliseconds": 16.6666,
+      "actualFrameTimeMilliseconds": 0.398,
+      "driftMilliseconds": 0.6766,
+      "fixedStepCount": 1,
+      "budgetExceeded": false,
+      "isBudgetEvent": false
+    },
+    {
+      "frameIndex": 4,
+      "timestamp": "2025-10-20T05:47:51.6135881+00:00",
+      "targetFrameTimeMilliseconds": 16.6666,
+      "actualFrameTimeMilliseconds": 0.5434,
+      "driftMilliseconds": 12.072,
+      "fixedStepCount": 2,
+      "budgetExceeded": false,
+      "isBudgetEvent": false
+    },
+    {
+      "frameIndex": 5,
+      "timestamp": "2025-10-20T05:47:51.6276945+00:00",
+      "targetFrameTimeMilliseconds": 16.6666,
+      "actualFrameTimeMilliseconds": 0.4215,
+      "driftMilliseconds": 9.6382,
+      "fixedStepCount": 1,
+      "budgetExceeded": false,
+      "isBudgetEvent": false
+    },
+    {
+      "frameIndex": 6,
+      "timestamp": "2025-10-20T05:47:51.6568449+00:00",
+      "targetFrameTimeMilliseconds": 16.6666,
+      "actualFrameTimeMilliseconds": 0.5458,
+      "driftMilliseconds": 5.3327,
+      "fixedStepCount": 2,
+      "budgetExceeded": false,
+      "isBudgetEvent": false
+    },
+    {
+      "frameIndex": 7,
+      "timestamp": "2025-10-20T05:47:51.6807169+00:00",
+      "targetFrameTimeMilliseconds": 16.6666,
+      "actualFrameTimeMilliseconds": 0.5666,
+      "driftMilliseconds": 12.5174,
+      "fixedStepCount": 1,
+      "budgetExceeded": false,
+      "isBudgetEvent": false
+    }
+  ],
+  "allocators": {},
+  "jobSystems": {
+    "async": [
+      {
+        "name": "async",
+        "timestamp": "2025-10-20T05:47:51.5080862+00:00",
+        "pendingJobs": 0,
+        "activeWorkers": 0,
+        "completedJobs": 0,
+        "configuredWorkers": 2
+      },
+      {
+        "name": "async",
+        "timestamp": "2025-10-20T05:47:51.5658174+00:00",
+        "pendingJobs": 0,
+        "activeWorkers": 0,
+        "completedJobs": 16,
+        "configuredWorkers": 2
+      },
+      {
+        "name": "async",
+        "timestamp": "2025-10-20T05:47:51.5658801+00:00",
+        "pendingJobs": 0,
+        "activeWorkers": 0,
+        "completedJobs": 16,
+        "configuredWorkers": 2
+      },
+      {
+        "name": "async",
+        "timestamp": "2025-10-20T05:47:51.5666584+00:00",
+        "pendingJobs": 0,
+        "activeWorkers": 0,
+        "completedJobs": 48,
+        "configuredWorkers": 2
+      },
+      {
+        "name": "async",
+        "timestamp": "2025-10-20T05:47:51.5687109+00:00",
+        "pendingJobs": 0,
+        "activeWorkers": 0,
+        "completedJobs": 64,
+        "configuredWorkers": 2
+      },
+      {
+        "name": "async",
+        "timestamp": "2025-10-20T05:47:51.6135881+00:00",
+        "pendingJobs": 0,
+        "activeWorkers": 0,
+        "completedJobs": 96,
+        "configuredWorkers": 2
+      },
+      {
+        "name": "async",
+        "timestamp": "2025-10-20T05:47:51.6276945+00:00",
+        "pendingJobs": 0,
+        "activeWorkers": 0,
+        "completedJobs": 112,
+        "configuredWorkers": 2
+      },
+      {
+        "name": "async",
+        "timestamp": "2025-10-20T05:47:51.6568449+00:00",
+        "pendingJobs": 0,
+        "activeWorkers": 0,
+        "completedJobs": 144,
+        "configuredWorkers": 2
+      },
+      {
+        "name": "async",
+        "timestamp": "2025-10-20T05:47:51.6807169+00:00",
+        "pendingJobs": 0,
+        "activeWorkers": 0,
+        "completedJobs": 160,
+        "configuredWorkers": 2
+      }
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "example-session-async": {
+    "async": {
+      "pendingAvg": 1.25,
+      "pendingMax": 9,
+      "activePeak": 4,
+      "completedFinal": 10800
+    }
+  },
+  "example-session-workstealing": {
+    "workstealing": {
+      "pendingAvg": 0.95,
+      "pendingMax": 7,
+      "activePeak": 4,
+      "completedFinal": 10800
+    }
+  },
+  "example-session-bifurcated": {
+    "bifurcated": {
+      "pendingAvg": 1.05,
+      "pendingMax": 8,
+      "activePeak": 4,
+      "completedFinal": 10800
+    }
+  }
+}

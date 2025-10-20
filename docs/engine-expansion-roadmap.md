@@ -25,14 +25,13 @@ This roadmap captures the multi-part initiative outlined for the editor/runtime 
 
 **Dependencies:** Logging docs (done), platform interface spec (TBD).
 
-**Status (Oct 18, 2025):** Deterministic timing loop now powers both the Avalonia runtime preview host and the standalone runtime entry via `FrameLoopController`, emitting frame-budget telemetry through the logging stack. Drift snapshots are cached for upcoming UI surfacing, and a platform service abstraction with a Windows stub is available for allocator/job-system integration work.
+**Status (Oct 20, 2025):** Deterministic timing loop now powers both the Avalonia runtime preview host and the standalone runtime entry via `FrameLoopController`, emitting frame-budget telemetry through the logging stack. Drift snapshots are cached for upcoming UI surfacing, and the platform service abstraction with a Windows stub continues to back allocator/job-system integration work. The Avalonia host initializes those platform services so editor tooling shares the same contracts. The allocator bundle (`ArenaAllocator`, `StackAllocator`, `PoolAllocator`) is unified behind `MemoryAllocatorConfiguration`/`MemoryAllocatorSet`, registers automatically with diagnostics, and is documented at `docs/memory-allocators.md`; telemetry exports now capture fragmentation metrics for every allocator session, the deterministic headless harness now rents its job-handle buffers from the shared stack allocator to avoid per-frame GC churn, and runtime gameplay colliders are staged through an arena-backed buffer so map loads report allocator pressure directly. The job-system API surface (`DotGame.Core.Async.Jobs`) now exposes reusable fences, barriers, and the new semaphore throttle (`JobSemaphore`) documented in `docs/job-system-primitives.md`; both scheduler spikes (`Experimental.WorkStealingJobSystem`, `Experimental.BifurcatedJobSystem`) are ready for evaluation, the headless harness honors `DOTGAME_RUNTIME_HEADLESS_CONCURRENCY` to enforce in-flight budgets, and the job-system selection flows through `DOTGAME_RUNTIME_JOB_SYSTEM` / `DOTGAME_RUNTIME_JOB_WORKERS` while the background scheduler mirrors the resolved worker count. The deterministic telemetry workflow (docs + scripts) is live, the headless deterministic harness (`DOTGAME_RUNTIME_HEADLESS_*`) keeps sweeps GPU-independent, the GitHub Actions workflow (`.github/workflows/deterministic-telemetry.yml`) now exercises the sweep/analyzer end-to-end with optional baseline gating, and the cross-platform services plan is captured at `docs/platform-services-architecture.md`.
 
 **Next Actions:**
-1. Wire new platform services into the Avalonia host and shared tooling bootstrap so editor utilities share the same thread/file/time contracts.
-2. Prototype arena allocator with instrumentation hooks feeding logs/telemetry.
-3. Design job system API surface, schedule spike comparing work-stealing vs. bifurcated queues.
-4. Expose preview timing telemetry in-editor (status widget/log panel) and capture JSON snapshots for QA checklist automation.
-5. Author short design note describing platform service extension points (Linux/macOS) and file it alongside the blueprint.
+1. Drive allocator adoption: wire the new allocator bundle into rendering/resource subsystems and document recommended usage patterns per subsystem. (Configuration parser tests now live under `DotGame.Core.Tests`.)
+2. Broaden semaphore adoption: route asset streaming/render preparation through `JobSemaphore` budgets, add regression tests for permit exhaustion, and capture configuration guidance in the runtime docs.
+3. Execute the newly documented platform plan (`docs/platform-services-architecture.md`): extend `IPlatformServices` to cover windowing/memory/diagnostics, stub Linux/macOS implementations, and prep the build system for multi-target publish profiles.
+4. Surface deterministic telemetry inside the editor UI (status widget/log panel) and capture JSON snapshots for QA automation now that the runtime exports are stable.
 
 ---
 
@@ -162,7 +161,7 @@ This roadmap captures the multi-part initiative outlined for the editor/runtime 
 ### Immediate Coordination Checklist
 
 - [x] Publish "Core Concepts Blueprint" covering timing, rendering abstraction, data layout utilities, and modularity docs. (See `docs/core-concepts-blueprint.md`.)
-- [ ] Roll deterministic frame loop integration across runtime hosts and surface telemetry in editor UI. *(Runtime entry complete; UI telemetry pending.)*
+- [ ] Surface deterministic frame telemetry in editor UI. *(Loop integration across runtime + Avalonia hosts complete; UI exposure pending.)*
 - [ ] Assign leads for Part II subsystems (allocators, job system, platform layer).
 - [ ] Schedule rendering architecture kickoff workshop (Part III).
 - [ ] Open RFC template for cross-team design proposals referencing roadmap sections.

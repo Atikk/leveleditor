@@ -1,7 +1,9 @@
 ﻿using System;
 using DotGame.Core.Async;
+using DotGame.Core.Async.Jobs;
 using DotGame.Core.Entities;
 using DotGame.Core.Resources;
+using DotGame.Core.Memory;
 using DotGame.Core.States;
 using DotGame.Runtime.GameData;
 using DotGame.Runtime.Input;
@@ -18,6 +20,9 @@ namespace DotGame.Runtime;
 
 public sealed class Game1 : Game
 {
+    private const int DefaultWorkerCount = 2;
+    private const int MaxWorkerCount = 64;
+
     private readonly GraphicsDeviceManager _graphics;
     private readonly EntityWorld _world = new();
     private readonly GameStateStack _stateStack = new();
@@ -29,9 +34,39 @@ public sealed class Game1 : Game
     private AsyncTaskScheduler? _scheduler;
     private ResourceManager? _resourceManager;
     private ResourceHandle<GameDataLoadReport>? _gameDataLoadHandle;
+    private readonly IJobSystem _jobSystem;
+    private readonly bool _ownsJobSystem;
+    private readonly int _schedulerWorkerCount;
+    private readonly MemoryAllocatorSet _allocators;
+    private readonly bool _ownsAllocators;
 
-    public Game1()
+    public Game1(IJobSystem? jobSystem = null, int? schedulerWorkerCount = null, MemoryAllocatorSet? allocators = null)
     {
+        var resolvedWorkerCount = Math.Clamp(schedulerWorkerCount ?? DefaultWorkerCount, 1, MaxWorkerCount);
+        if (jobSystem is null)
+        {
+            _jobSystem = new AsyncTaskJobSystem(workerCount: resolvedWorkerCount, workerNamePrefix: "RuntimeJob-");
+            _ownsJobSystem = true;
+        }
+        else
+        {
+            _jobSystem = jobSystem;
+            _ownsJobSystem = false;
+        }
+
+        _schedulerWorkerCount = resolvedWorkerCount;
+
+        if (allocators is null)
+        {
+            _allocators = MemoryAllocatorConfiguration.Default.CreateAllocators();
+            _ownsAllocators = true;
+        }
+        else
+        {
+            _allocators = allocators;
+            _ownsAllocators = false;
+        }
+
         _graphics = new GraphicsDeviceManager(this)
         {
             PreferredBackBufferWidth = 1280,
@@ -50,7 +85,7 @@ public sealed class Game1 : Game
 
     protected override void LoadContent()
     {
-        _scheduler = new AsyncTaskScheduler(workerCount: 2, workerNamePrefix: "RuntimeWorker-");
+        _scheduler = new AsyncTaskScheduler(workerCount: _schedulerWorkerCount, workerNamePrefix: "RuntimeWorker-");
         _resourceManager = new ResourceManager(_scheduler);
         _scheduler.UnhandledException += ex => Console.WriteLine($"[Scheduler] Unhandled exception: {ex.Message}");
 
@@ -62,7 +97,7 @@ public sealed class Game1 : Game
         _camera = camera;
         _cameraController = new CameraController(camera, adapter);
         var gameData = new GameDataRepository();
-        _runtimeContext = new RuntimeContext(Content, GraphicsDevice, spriteBatch, _world, camera, gameData, _scheduler, _resourceManager);
+    _runtimeContext = new RuntimeContext(Content, GraphicsDevice, spriteBatch, _world, camera, gameData, _scheduler, _resourceManager, _jobSystem, _allocators);
 
         if (_resourceManager != null)
         {
@@ -104,7 +139,7 @@ public sealed class Game1 : Game
             return;
         }
 
-    _resourceManager?.PumpMainThread();
+        _resourceManager?.PumpMainThread();
 
         var clock = GameClock.From(gameTime.ElapsedGameTime, gameTime.TotalGameTime);
         var keyboard = Keyboard.GetState();
@@ -143,10 +178,20 @@ public sealed class Game1 : Game
         {
             Window.ClientSizeChanged -= OnClientSizeChanged;
             _stateStack.Dispose();
+            if (_ownsJobSystem)
+                _jobSystem.Dispose();
+            if (_ownsAllocators)
+                _allocators.Dispose();
         }
 
         base.Dispose(disposing);
     }
+
+    public IJobSystem JobSystem => _jobSystem;
+
+    public int SchedulerWorkerCount => _schedulerWorkerCount;
+
+    public MemoryAllocatorSet Allocators => _allocators;
 
     private void OnClientSizeChanged(object? sender, EventArgs e)
     {

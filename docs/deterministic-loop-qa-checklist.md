@@ -42,7 +42,7 @@ _Add rows per platform as build support expands._
 
 ## 4. Telemetry Capture
 
-- [ ] Enable JSON/CSV export mode (when available) and capture session traces for automated analysis.
+- [ ] Set `DOTGAME_QA_TELEMETRY_DIR` (and optional `DOTGAME_QA_SESSION`) so the runtime harness exports `RuntimeTelemetryRecorder` JSON/CSV traces automatically.
 - [ ] Annotate log files with build hash, hardware info, and test scenario.
 - [ ] Upload logs to central diagnostics store.
 

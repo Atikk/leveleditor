@@ -1,6 +1,8 @@
 using System;
 using DotGame.Core.Async;
+using DotGame.Core.Async.Jobs;
 using DotGame.Core.Entities;
+using DotGame.Core.Memory;
 using DotGame.Core.Resources;
 using DotGame.Runtime.GameData;
 using Microsoft.Xna.Framework.Content;
@@ -11,7 +13,7 @@ namespace DotGame.Runtime.Rendering;
 
 public sealed class RuntimeContext
 {
-    public RuntimeContext(ContentManager content, GraphicsDevice graphicsDevice, SpriteBatch spriteBatch, EntityWorld world, OrthographicCamera camera, GameDataRepository gameData, AsyncTaskScheduler scheduler, ResourceManager resources)
+    public RuntimeContext(ContentManager content, GraphicsDevice graphicsDevice, SpriteBatch spriteBatch, EntityWorld world, OrthographicCamera camera, GameDataRepository gameData, AsyncTaskScheduler scheduler, ResourceManager resources, IJobSystem jobSystem, MemoryAllocatorSet allocators)
     {
         Content = content ?? throw new ArgumentNullException(nameof(content));
         GraphicsDevice = graphicsDevice ?? throw new ArgumentNullException(nameof(graphicsDevice));
@@ -21,6 +23,8 @@ public sealed class RuntimeContext
         GameData = gameData ?? throw new ArgumentNullException(nameof(gameData));
         Scheduler = scheduler ?? throw new ArgumentNullException(nameof(scheduler));
         Resources = resources ?? throw new ArgumentNullException(nameof(resources));
+        JobSystem = jobSystem ?? throw new ArgumentNullException(nameof(jobSystem));
+        Allocators = allocators ?? throw new ArgumentNullException(nameof(allocators));
     }
 
     public ContentManager Content { get; }
@@ -38,4 +42,8 @@ public sealed class RuntimeContext
     public AsyncTaskScheduler Scheduler { get; }
 
     public ResourceManager Resources { get; }
+
+    public IJobSystem JobSystem { get; }
+
+    public MemoryAllocatorSet Allocators { get; }
 }
