@@ -30,7 +30,7 @@ This roadmap captures the multi-part initiative outlined for the editor/runtime 
 **Next Actions:**
 1. Drive allocator adoption: wire the new allocator bundle into rendering/resource subsystems and document recommended usage patterns per subsystem. (Configuration parser tests now live under `DotGame.Core.Tests`.)
 2. Broaden semaphore adoption: route asset streaming/render preparation through `JobSemaphore` budgets, add regression tests for permit exhaustion, and capture configuration guidance in the runtime docs.
-3. Execute the newly documented platform plan (`docs/platform-services-architecture.md`): extend `IPlatformServices` to cover windowing/memory/diagnostics, stub Linux/macOS implementations, and prep the build system for multi-target publish profiles.
+3. Execute the newly documented platform plan (`docs/platform-services-architecture.md`): extend `IPlatformServices` to cover windowing/memory/diagnostics *(interfaces now live, Windows/Linux/macOS stubs complete, publish profiles available)* and wire the build/CI pipeline to consume the new multi-target outputs.
 4. Surface deterministic telemetry inside the editor UI (status widget/log panel) and capture JSON snapshots for QA automation now that the runtime exports are stable.
 
 ---

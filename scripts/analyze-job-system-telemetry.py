@@ -2,6 +2,10 @@
 """Summarise telemetry exports produced by collect-job-system-telemetry.ps1."""
 
 from __future__ import annotations
+#!/usr/bin/env python3
+"""Summarise telemetry exports produced by collect-job-system-telemetry.ps1."""
+
+from __future__ import annotations
 
 import argparse
 import csv
@@ -40,6 +44,12 @@ class Summary:
             "configuredWorkers": self.configured_workers,
             "completedFinal": self.completed_final,
         }
+
+
+@dataclass
+class SessionResult:
+    jobs: Dict[str, Summary]
+    metadata: Dict[str, str]
 
 
 def parse_csv(path: Path) -> Dict[str, List[JobSample]]:
@@ -89,14 +99,31 @@ def discover_job_csvs(root: Path) -> Dict[str, Path]:
     return outputs
 
 
-def analyse_directory(directory: Path) -> Dict[str, Dict[str, Summary]]:
-    sessions: Dict[str, Dict[str, Summary]] = {}
+def load_session_metadata(session_dir: Path) -> Dict[str, str]:
+    json_candidates = sorted(session_dir.glob("*.json"))
+    if not json_candidates:
+        return {}
+
+    latest = max(json_candidates, key=lambda path: path.stat().st_mtime)
+    try:
+        payload = json.loads(latest.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+    metadata = payload.get("metadata") if isinstance(payload, dict) else None
+    if not isinstance(metadata, dict):
+        return {}
+
+    return {str(key): str(value) for key, value in metadata.items()}
+
+
+def analyse_directory(directory: Path) -> Dict[str, SessionResult]:
+    sessions: Dict[str, SessionResult] = {}
     for session_dir in directory.iterdir():
         if not session_dir.is_dir():
             continue
+
         csv_map = discover_job_csvs(session_dir)
-        if not csv_map:
-            continue
         session_results: Dict[str, Summary] = {}
         for _, csv_path in csv_map.items():
             sample_groups = parse_csv(csv_path)
@@ -104,27 +131,41 @@ def analyse_directory(directory: Path) -> Dict[str, Dict[str, Summary]]:
                 summary = summarise(samples)
                 if summary is not None:
                     session_results[job_name] = summary
-        if session_results:
-            sessions[session_dir.name] = session_results
+
+        metadata = load_session_metadata(session_dir)
+
+        if session_results or metadata:
+            sessions[session_dir.name] = SessionResult(jobs=session_results, metadata=metadata)
     return sessions
 
 
-def format_summary(data: Dict[str, Dict[str, Summary]]) -> str:
+def format_summary(data: Dict[str, SessionResult]) -> str:
     lines: List[str] = []
-    for session, jobs in sorted(data.items()):
+    for session, result in sorted(data.items()):
         lines.append(f"Session: {session}")
-        for job_name, summary in sorted(jobs.items()):
+        if result.metadata:
+            for key, value in sorted(result.metadata.items()):
+                lines.append(f"  meta[{key}] = {value}")
+        for job_name, summary in sorted(result.jobs.items()):
             metrics = summary.to_dict()
             lines.append(
                 "  {name}: samples={samples}, pending(avg={pendingAvg}, max={pendingMax}), "
                 "active(avg={activeAvg}, peak={activePeak}), configured={configuredWorkers}, "
                 "completedFinal={completedFinal}".format(name=job_name, **metrics)
             )
+        if not result.jobs:
+            lines.append("  (no job telemetry captured)")
     return "\n".join(lines)
 
 
-def write_json(path: Path, data: Dict[str, Dict[str, Summary]]) -> None:
-    payload = {session: {job: summary.to_dict() for job, summary in jobs.items()} for session, jobs in data.items()}
+def write_json(path: Path, data: Dict[str, SessionResult]) -> None:
+    payload = {
+        session: {
+            "metadata": result.metadata,
+            "jobs": {job: summary.to_dict() for job, summary in result.jobs.items()},
+        }
+        for session, result in data.items()
+    }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
@@ -136,9 +177,14 @@ def load_json(path: Path) -> Dict[str, Dict[str, Dict[str, float]]]:
     if not isinstance(raw, dict):
         raise SystemExit(f"Baseline file '{path}' must contain a JSON object at the root.")
     result: Dict[str, Dict[str, Dict[str, float]]] = {}
-    for session, jobs in raw.items():
-        if not isinstance(jobs, dict):
+    for session, payload in raw.items():
+        if not isinstance(payload, dict):
             raise SystemExit(f"Baseline session '{session}' must map to an object of job metrics.")
+
+        jobs = payload.get("jobs", payload)
+        if not isinstance(jobs, dict):
+            raise SystemExit(f"Baseline session '{session}' must expose a 'jobs' object with metrics.")
+
         session_map: Dict[str, Dict[str, float]] = {}
         for job, metrics in jobs.items():
             if not isinstance(metrics, dict):
@@ -156,7 +202,7 @@ def load_json(path: Path) -> Dict[str, Dict[str, Dict[str, float]]]:
 
 
 def compare_against_baseline(
-    current: Dict[str, Dict[str, Summary]],
+    current: Dict[str, SessionResult],
     baseline: Dict[str, Dict[str, Dict[str, float]]],
     tolerance: float,
 ) -> Tuple[List[str], List[str]]:
@@ -170,13 +216,14 @@ def compare_against_baseline(
         if session not in current:
             regressions.append(f"Baseline session '{session}' missing from current results.")
             continue
+        current_jobs = current[session].jobs
         for job_name, baseline_metrics in jobs.items():
-            if job_name not in current[session]:
+            if job_name not in current_jobs:
                 regressions.append(
                     f"Baseline job '{job_name}' under session '{session}' missing from current results."
                 )
                 continue
-            current_metrics = current[session][job_name].to_dict()
+            current_metrics = current_jobs[job_name].to_dict()
             for metric_name, baseline_value in baseline_metrics.items():
                 if metric_name not in current_metrics:
                     notes.append(
@@ -231,7 +278,7 @@ def main() -> None:
         raise SystemExit(f"Telemetry root '{args.telemetry_root}' does not exist.")
 
     results = analyse_directory(args.telemetry_root)
-    if not results:
+    if not results or not any(result.jobs for result in results.values()):
         raise SystemExit("No job-system CSV exports found under telemetry root.")
 
     print(format_summary(results))

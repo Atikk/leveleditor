@@ -40,7 +40,7 @@
                 <!-- Tools Row -->
                 <ScrollViewer Grid.Row="1"
                               Grid.ColumnSpan="2"
-                              HorizontalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Visible"
                               VerticalScrollBarVisibility="Disabled"
                               Margin="0,2,0,0">
                     <WrapPanel Name="MainToolBar" Orientation="Horizontal" VerticalAlignment="Center">
@@ -77,6 +77,7 @@
                         <Button Name="BtnLoadMap" Content="Load" MinWidth="90" />
                         <Button Name="BtnMonoGamePreview" Content="Preview" MinWidth="100" Classes="primary" />
                         <Button Name="BtnReloadGameData" Content="Reload Data" MinWidth="130" />
+                        <Button Name="BtnDiagnosticsToggle" Content="Diagnostics / Logging" MinWidth="170" />
                         <Button Name="BtnSpriteEditor" Content="Sprite Editor" MinWidth="130" />
                     </WrapPanel>
                 </ScrollViewer>
@@ -434,35 +435,6 @@
                         </Border>
                     </StackPanel>
                 </TabItem>
-                <TabItem Header="Logs">
-                    <StackPanel Margin="14" Spacing="10">
-                        <ListBox Name="LogList" Height="340" Background="Transparent" BorderThickness="0" ScrollViewer.VerticalScrollBarVisibility="Auto">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate x:CompileBindings="False">
-                                    <Border Background="#FFFFFF"
-                                            BorderBrush="#E5E7EB"
-                                            BorderThickness="1"
-                                            CornerRadius="8"
-                                            Padding="10"
-                                            Margin="0,0,0,8">
-                                        <StackPanel Spacing="6">
-                                            <TextBlock Text="{Binding Header}"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="{Binding Accent}" />
-                                            <TextBlock Text="{Binding Message}"
-                                                       TextWrapping="Wrap"
-                                                       Foreground="#111827" />
-                                            <TextBlock Text="{Binding ExceptionMessage}"
-                                                       TextWrapping="Wrap"
-                                                       Foreground="#9B1C1C"
-                                                       IsVisible="{Binding HasException}" />
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </StackPanel>
-                </TabItem>
             </TabControl>
         </Border>
 
@@ -560,6 +532,129 @@
                         </Grid>
                     </TabItem>
                 </TabControl>
+            </Border>
+            <Border Name="DiagnosticsPanel"
+                    Background="White"
+                    BorderBrush="#D1D5DB"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="16"
+                    Width="380"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Stretch"
+                    Margin="0,16,16,16"
+                    IsVisible="False">
+                <StackPanel Spacing="12">
+                    <DockPanel>
+                        <TextBlock Text="Diagnostics &amp; Logging"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="#111827"
+                                   VerticalAlignment="Center" />
+                        <Button Name="BtnCloseDiagnostics"
+                                Content="Close"
+                                MinWidth="70"
+                                HorizontalAlignment="Right"
+                                Margin="12,0,0,0"
+                                DockPanel.Dock="Right" />
+                    </DockPanel>
+                    <Button Name="BtnCaptureTelemetry"
+                            Content="Capture Telemetry"
+                            Classes="primary"
+                            HorizontalAlignment="Stretch"
+                            MinHeight="36" />
+                    <TabControl>
+                        <TabItem Header="Telemetry">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel Margin="0,8,0,0" Spacing="10">
+                                    <TextBlock Name="TelemetryStatusText"
+                                               Text="No telemetry captures yet."
+                                               Foreground="#374151"
+                                               TextWrapping="Wrap" />
+                                    <ItemsControl Name="TelemetrySessionsList">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:CompileBindings="False">
+                                                <Border Background="#FFFFFF"
+                                                        BorderBrush="#E5E7EB"
+                                                        BorderThickness="1"
+                                                        CornerRadius="8"
+                                                        Padding="12"
+                                                        Margin="0,0,0,10">
+                                                    <StackPanel Spacing="8">
+                                                        <TextBlock Text="{Binding Header}"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="#111827" />
+                                                        <TextBlock Text="{Binding Summary}"
+                                                                   TextWrapping="Wrap"
+                                                                   Foreground="#4B5563" />
+                                                        <ItemsControl ItemsSource="{Binding Metadata}"
+                                                                      IsVisible="{Binding HasMetadata}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate x:CompileBindings="False">
+                                                                    <TextBlock Text="{Binding Display}"
+                                                                               FontSize="12"
+                                                                               Foreground="#6B7280" />
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                        <ItemsControl ItemsSource="{Binding Jobs}"
+                                                                      IsVisible="{Binding HasJobs}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate x:CompileBindings="False">
+                                                                    <TextBlock Text="{Binding Summary}"
+                                                                               FontSize="12"
+                                                                               Foreground="#1F2937" />
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                        <Button Content="Open JSON"
+                                                                Tag="{Binding JsonPath}"
+                                                                HorizontalAlignment="Left"
+                                                                MinWidth="110"
+                                                                Click="TelemetryOpenJsonButton_Click" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+                        <TabItem Header="Logs">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ListBox Name="LogList"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         Margin="0,8,0,0"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:CompileBindings="False">
+                                            <Border Background="#FFFFFF"
+                                                    BorderBrush="#E5E7EB"
+                                                    BorderThickness="1"
+                                                    CornerRadius="8"
+                                                    Padding="10"
+                                                    Margin="0,0,0,8">
+                                                <StackPanel Spacing="6">
+                                                    <TextBlock Text="{Binding Header}"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{Binding Accent}" />
+                                                    <TextBlock Text="{Binding Message}"
+                                                               TextWrapping="Wrap"
+                                                               Foreground="#111827" />
+                                                    <TextBlock Text="{Binding ExceptionMessage}"
+                                                               TextWrapping="Wrap"
+                                                               Foreground="#9B1C1C"
+                                                               IsVisible="{Binding HasException}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </ScrollViewer>
+                        </TabItem>
+                    </TabControl>
+                </StackPanel>
             </Border>
         </Grid>
     </DockPanel>

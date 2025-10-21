@@ -11,7 +11,9 @@ param(
     [int]$HeadlessJobsPerFrame = 96,
     [int]$HeadlessJobIterations = 8,
     [int]$HeadlessInnerLoopIterations = 256,
-    [int]$HeadlessBatchSize = 1
+    [int]$HeadlessBatchSize = 1,
+    [string]$RuntimeIdentifier,
+    [string]$PlatformServices = "windows"
 )
 
 $scriptRoot = $PSScriptRoot
@@ -73,8 +75,13 @@ if (-not (Test-Path $OutputRoot)) {
 }
 
 if (-not $NoBuild) {
-    Write-Host "Building DotGame.Runtime ($Configuration)..." -ForegroundColor Yellow
-    dotnet build $projectPath --configuration $Configuration
+    Write-Host "Building DotGame.Runtime ($Configuration, RID=${RuntimeIdentifier})..." -ForegroundColor Yellow
+    $buildArgs = @($projectPath, "--configuration", $Configuration)
+    if (-not [string]::IsNullOrWhiteSpace($RuntimeIdentifier)) {
+        $buildArgs += @("--runtime", $RuntimeIdentifier)
+    }
+
+    dotnet build @buildArgs
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet build failed with exit code $LASTEXITCODE."
     }
@@ -117,7 +124,12 @@ foreach ($workerCount in $workerCounts) {
         }
 
         Write-Host "Running runtime with scheduler '$scheduler' (workers=$workerCount)..." -ForegroundColor Cyan
-        dotnet run --project $projectPath --configuration $Configuration --no-build
+        $runArgs = @("--project", $projectPath, "--configuration", $Configuration, "--no-build")
+        if (-not [string]::IsNullOrWhiteSpace($PlatformServices)) {
+            $env:DOTGAME_PLATFORM_IMPLEMENTATION = $PlatformServices
+        }
+
+        dotnet run @runArgs
         $exitCode = $LASTEXITCODE
 
         $results += [pscustomobject]@{
@@ -149,6 +161,7 @@ $env:DOTGAME_RUNTIME_HEADLESS_JOBS = $null
 $env:DOTGAME_RUNTIME_HEADLESS_ITERATIONS = $null
 $env:DOTGAME_RUNTIME_HEADLESS_WORK = $null
 $env:DOTGAME_RUNTIME_HEADLESS_BATCH = $null
+$env:DOTGAME_PLATFORM_IMPLEMENTATION = $null
 
 Write-Host ""
 Write-Host "Telemetry sweep complete:" -ForegroundColor Green

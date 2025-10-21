@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using DotGame.Core.Memory;
+using DotGame.Core.Platform;
 using DotGame.Core.Timing;
 using DotGame.Core.Async.Jobs;
 
@@ -16,6 +17,7 @@ public sealed class RuntimeTelemetryRecorder : IFrameBudgetListener, IDisposable
     private readonly Dictionary<string, IJobSystem> jobSystems = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> jobSystemWorkerCapacities = new(StringComparer.Ordinal);
     private readonly HashSet<FrameLoopController> attachedLoops = new();
+    private readonly Dictionary<string, string> metadata = new(StringComparer.Ordinal);
     private bool disposed;
 
     public void Attach(FrameLoopController loop)
@@ -92,7 +94,9 @@ public sealed class RuntimeTelemetryRecorder : IFrameBudgetListener, IDisposable
             foreach (var (key, value) in jobSystemSamples)
                 jobCopy[key] = value.ToArray();
 
-            return new RuntimeTelemetryExport(frameCopy, allocatorCopy, jobCopy);
+            var platformSnapshot = CapturePlatformSnapshotUnsafe();
+            var metadataCopy = new Dictionary<string, string>(metadata, StringComparer.Ordinal);
+            return new RuntimeTelemetryExport(frameCopy, allocatorCopy, jobCopy, platformSnapshot.Diagnostics, platformSnapshot.Memory, metadataCopy, DateTimeOffset.UtcNow);
         }
     }
 
@@ -126,6 +130,18 @@ public sealed class RuntimeTelemetryRecorder : IFrameBudgetListener, IDisposable
             jobSystemSamples.Clear();
             jobSystems.Clear();
             jobSystemWorkerCapacities.Clear();
+        }
+    }
+
+    public void SetMetadata(string key, string value)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            throw new ArgumentException("Metadata key must be provided.", nameof(key));
+
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            metadata[key] = value ?? string.Empty;
         }
     }
 
@@ -267,6 +283,37 @@ public sealed class RuntimeTelemetryRecorder : IFrameBudgetListener, IDisposable
         }
     }
 
+    private static PlatformSnapshot CapturePlatformSnapshotUnsafe()
+    {
+        PlatformDiagnosticSnapshot? diagnostics = null;
+        MemoryStatistics? memory = null;
+
+        if (!PlatformServices.IsInitialized)
+            return new PlatformSnapshot(null, null);
+
+        var services = PlatformServices.Current;
+
+        try
+        {
+            diagnostics = services.Diagnostics.CaptureSnapshot();
+        }
+        catch
+        {
+            diagnostics = null;
+        }
+
+        try
+        {
+            memory = services.Memory.QueryProcessMemory();
+        }
+        catch
+        {
+            memory = null;
+        }
+
+        return new PlatformSnapshot(diagnostics, memory);
+    }
+
     private void ThrowIfDisposed()
     {
         if (disposed)
@@ -362,4 +409,6 @@ public sealed class RuntimeTelemetryRecorder : IFrameBudgetListener, IDisposable
             owner.RemoveJobSystem(name);
         }
     }
+
+    private readonly record struct PlatformSnapshot(PlatformDiagnosticSnapshot? Diagnostics, MemoryStatistics? Memory);
 }

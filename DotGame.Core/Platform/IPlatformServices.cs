@@ -9,4 +9,10 @@ public interface IPlatformServices
     IThreadServices Threading { get; }
 
     ITimeSource TimeSource { get; }
+
+    IWindowServices Windowing { get; }
+
+    IMemoryServices Memory { get; }
+
+    IDiagnosticServices Diagnostics { get; }
 }

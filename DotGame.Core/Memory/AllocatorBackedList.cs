@@ -41,7 +41,7 @@ public sealed class AllocatorBackedList<T> : IReadOnlyList<T>, IDisposable where
         var owner = allocator.Allocate(totalBytes, alignment);
         var span = MemoryMarshal.Cast<byte, T>(owner.Memory.Span);
         source.CopyTo(span[..source.Length]);
-    return new AllocatorBackedList<T>(owner, source.Length);
+        return new AllocatorBackedList<T>(owner, source.Length);
     }
 
     public int Count => count;
@@ -109,19 +109,21 @@ public sealed class AllocatorBackedList<T> : IReadOnlyList<T>, IDisposable where
 
         public T Current => current;
 
-        object IEnumerator.Current => Current!;
+        object IEnumerator.Current => Current;
 
         public bool MoveNext()
         {
             var next = index + 1;
-            if (next >= list.Count)
+            var span = list.AsReadOnlySpan();
+
+            if (next >= span.Length)
             {
                 current = default;
                 return false;
             }
 
             index = next;
-            current = list[next];
+            current = span[next];
             return true;
         }
 

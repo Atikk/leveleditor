@@ -11,11 +11,16 @@ This note captures the cross-platform plan for runtime services, build integrati
 
 ## Current Inventory (Oct 2025)
 
-- **Interfaces:** `DotGame.Core.Platform` exposes `IPlatformServices`, `IFileSystem`, `IThreadServices`, and `ITimeSource` contracts. `PlatformServices.Initialize(...)` stores the active implementation.
-- **Windows implementation:** `DotGame.Runtime.Platform.WindowsPlatformServices` supplies file system, thread services (ThreadPool-backed background work), and high-resolution timing. This implementation powers both the Avalonia preview host and the standalone runtime.
+- **Interfaces:** `DotGame.Core.Platform` exposes `IPlatformServices`, `IFileSystem`, `IThreadServices`, `ITimeSource`, `IWindowServices`, `IMemoryServices`, and `IDiagnosticServices`. `PlatformServices.Initialize(...)` stores the active implementation.
+- **Windows implementation:** `DotGame.Runtime.Platform.WindowsPlatformServices` supplies file system, thread services (ThreadPool-backed background work), high-resolution timing, and baseline memory/diagnostic data. This implementation powers both the Avalonia preview host and the standalone runtime.
+- **Linux stub:** `DotGame.Runtime.Platform.LinuxPlatformServices` mirrors the Windows surface with functional file/thread/time/memory/diagnostic services while windowing remains unimplemented. Use it to unblock headless sweeps on Linux until full window/input integration ships.
+- **macOS stub:** `DotGame.Runtime.Platform.MacPlatformServices` provides the same baseline feature set for macOS. Swap implementations via the `DOTGAME_PLATFORM_IMPLEMENTATION` environment variable or tool script switches while multi-targeting is wired up.
+- **Runtime selection:** `RuntimePlatformFactory` inspects `DOTGAME_PLATFORM_IMPLEMENTATION` and falls back to the Windows implementation when unset/unknown, logging the resolved identifier for telemetry correlation.
+- **Telemetry:** Deterministic telemetry exports now embed `PlatformServices.Diagnostics`, `PlatformServices.Memory`, and resolved platform metadata so sweeps capture OS/process context alongside configuration details.
+- **Publish profiles:** `DotGame.Runtime/DotGame.Runtime.csproj` declares runtime identifiers (`win-x64`, `linux-x64`, `osx-arm64`) and ships publish profiles under `Properties/PublishProfiles/`. Run `dotnet publish -p:PublishProfile=Runtime-<rid>` to produce platform-specific binaries (see `docs/runtime-publishing.md`).
 - **Coverage gaps:**
   - No Linux or macOS implementation exists yet.
-  - Window/event pump, input, high-resolution timers, and native library management are not abstracted.
+   - Window/event pump, input, high-resolution timers, and native library management are not abstracted beyond stubs.
   - Build scripts assume Windows (PowerShell, `.csproj` single target). Headless harness runs, but packaging/publishing for non-Windows targets is undefined.
   - Fragmentation telemetry that depends on OS memory queries is still TBD.
 

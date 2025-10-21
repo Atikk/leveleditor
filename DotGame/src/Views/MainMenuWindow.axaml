@@ -26,8 +26,11 @@
             </StackPanel>
         </Border>
 
-        <!-- Main Content -->
-        <ScrollViewer Grid.Row="1" Padding="36,28">
+    <!-- Main Content -->
+    <ScrollViewer Grid.Row="1"
+              Padding="36,28"
+              VerticalScrollBarVisibility="Visible"
+              HorizontalScrollBarVisibility="Disabled">
             <StackPanel Spacing="16">
                 <TextBlock Text="Choose Your Workspace"
                            FontSize="17"

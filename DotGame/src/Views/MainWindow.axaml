@@ -5,6 +5,11 @@
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="Dotgame.Avalonia.MainWindow"
         Title="Dotgame.Avalonia">
-    Welcome to Avalonia!
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Auto"
+                  Padding="16">
+        <TextBlock Text="Welcome to Avalonia!"
+                   TextWrapping="Wrap" />
+    </ScrollViewer>
 </Window>
 

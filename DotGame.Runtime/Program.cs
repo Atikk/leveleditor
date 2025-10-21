@@ -26,6 +26,7 @@ if (!string.IsNullOrWhiteSpace(telemetryDirectory))
             string.IsNullOrWhiteSpace(telemetrySessionName) ? "runtime" : telemetrySessionName);
         telemetrySession.Start();
         logger.Info($"Runtime telemetry session active; exporting to '{telemetryDirectory}'.");
+        TrySetTelemetryMetadata("telemetry.session", telemetrySessionName ?? "runtime");
     }
     catch (Exception ex)
     {
@@ -34,9 +35,18 @@ if (!string.IsNullOrWhiteSpace(telemetryDirectory))
     }
 }
 
-var platformServices = new WindowsPlatformServices();
+var platformActivation = RuntimePlatformFactory.CreateFromEnvironment();
+var platformServices = platformActivation.Services;
 PlatformServices.Initialize(platformServices);
 TimeSource.Initialize(platformServices.TimeSource);
+
+var requestedPlatform = string.IsNullOrWhiteSpace(platformActivation.Requested) ? "default" : platformActivation.Requested;
+logger.Info($"Platform services selection -> requested='{requestedPlatform}', resolved='{platformActivation.Resolved}'.");
+if (platformActivation.UsedFallback)
+    logger.Warn($"Unknown platform identifier '{requestedPlatform}'. Falling back to '{platformActivation.Resolved}'.");
+TrySetTelemetryMetadata("platform.requested", requestedPlatform);
+TrySetTelemetryMetadata("platform.resolved", platformActivation.Resolved);
+TrySetTelemetryMetadata("platform.fallback", platformActivation.UsedFallback ? "true" : "false");
 
 var allocatorConfiguration = MemoryAllocatorConfiguration.FromEnvironment();
 using var allocatorSet = allocatorConfiguration.CreateAllocators();
@@ -50,6 +60,10 @@ var requestedJobSystem = string.IsNullOrWhiteSpace(jobSystemActivation.Requested
 logger.Info($"Job system selection -> requested='{requestedJobSystem}', resolved='{jobSystemActivation.Resolved}', workers={jobSystemActivation.WorkerCount}.");
 if (jobSystemActivation.UsedFallback)
     logger.Warn($"Unknown job system identifier '{requestedJobSystem}'. Falling back to '{jobSystemActivation.Resolved}'.");
+TrySetTelemetryMetadata("jobSystem.requested", requestedJobSystem);
+TrySetTelemetryMetadata("jobSystem.resolved", jobSystemActivation.Resolved);
+TrySetTelemetryMetadata("jobSystem.workers", jobSystemActivation.WorkerCount.ToString());
+TrySetTelemetryMetadata("jobSystem.fallback", jobSystemActivation.UsedFallback ? "true" : "false");
 
 var headlessFlag = Environment.GetEnvironmentVariable("DOTGAME_RUNTIME_HEADLESS");
 var runHeadless = IsHeadlessEnabled(headlessFlag);
@@ -61,7 +75,14 @@ if (runHeadless)
         $"Headless mode enabled -> frames={headlessOptions.FrameCount}, jobs/frame={headlessOptions.JobsPerFrame}, " +
         $"iterations={headlessOptions.JobIterations}x{headlessOptions.InnerLoopIterations}, batch={headlessOptions.BatchSize}, " +
         $"fps={headlessOptions.TargetFrameRate:F2}.");
+    TrySetTelemetryMetadata("headless.frames", headlessOptions.FrameCount.ToString());
+    TrySetTelemetryMetadata("headless.jobsPerFrame", headlessOptions.JobsPerFrame.ToString());
+    TrySetTelemetryMetadata("headless.jobIterations", headlessOptions.JobIterations.ToString());
+    TrySetTelemetryMetadata("headless.innerLoopIterations", headlessOptions.InnerLoopIterations.ToString());
+    TrySetTelemetryMetadata("headless.batch", headlessOptions.BatchSize.ToString());
+    TrySetTelemetryMetadata("headless.targetFps", headlessOptions.TargetFrameRate.ToString("F2"));
 }
+TrySetTelemetryMetadata("headless.enabled", runHeadless ? "true" : "false");
 
 using var jobSystem = jobSystemActivation.JobSystem;
 using var cancellation = new CancellationTokenSource();
@@ -222,4 +243,19 @@ static bool IsHeadlessEnabled(string? value)
         || trimmed.Equals("yes", StringComparison.OrdinalIgnoreCase)
         || trimmed.Equals("on", StringComparison.OrdinalIgnoreCase)
         || trimmed.Equals("headless", StringComparison.OrdinalIgnoreCase);
+}
+
+void TrySetTelemetryMetadata(string key, string value)
+{
+    if (telemetrySession == null)
+        return;
+
+    try
+    {
+        telemetrySession.Recorder.SetMetadata(key, value);
+    }
+    catch (Exception ex)
+    {
+        logger.Warn($"Failed to record telemetry metadata '{key}': {ex.Message}");
+    }
 }

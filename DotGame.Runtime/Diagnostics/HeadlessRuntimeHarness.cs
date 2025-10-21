@@ -8,7 +8,7 @@ using DotGame.Core.Timing;
 
 namespace DotGame.Runtime.Diagnostics;
 
-internal sealed class HeadlessRuntimeHarness : IDisposable
+public sealed class HeadlessRuntimeHarness : IDisposable
 {
     private readonly IJobSystem jobSystem;
     private readonly HeadlessRuntimeOptions options;
@@ -109,7 +109,7 @@ internal sealed class HeadlessRuntimeHarness : IDisposable
     }
 }
 
-internal sealed class HeadlessRuntimeOptions
+public sealed class HeadlessRuntimeOptions
 {
     private const int DefaultFrameCount = 600;
     private const int DefaultJobsPerFrame = 96;
@@ -163,6 +163,20 @@ internal sealed class HeadlessRuntimeOptions
             seed: ReadInt("DOTGAME_RUNTIME_HEADLESS_SEED", DefaultSeed, int.MinValue + 1, int.MaxValue - 1),
             maxConcurrentJobs: ReadInt("DOTGAME_RUNTIME_HEADLESS_CONCURRENCY", DefaultMaxConcurrency, 0, 512),
             sampleStatistics: ReadBool("DOTGAME_RUNTIME_HEADLESS_SAMPLE_STATS", defaultValue: false));
+    }
+
+    public static HeadlessRuntimeOptions CreateDefault()
+    {
+        return new HeadlessRuntimeOptions(
+            DefaultFrameCount,
+            DefaultJobsPerFrame,
+            DefaultJobIterations,
+            DefaultInnerLoopIterations,
+            DefaultBatchSize,
+            DefaultFrameRate,
+            DefaultSeed,
+            DefaultMaxConcurrency,
+            sampleStatistics: false);
     }
 
     private static int ReadInt(string variable, int defaultValue, int min, int max)

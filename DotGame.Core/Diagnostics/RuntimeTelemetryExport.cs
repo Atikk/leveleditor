@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using DotGame.Core.Platform;
 
 namespace DotGame.Core.Diagnostics;
 
@@ -12,11 +13,19 @@ public sealed class RuntimeTelemetryExport
     public RuntimeTelemetryExport(
         IReadOnlyList<RuntimeTelemetryRecorder.FrameTimingSample> frames,
         IReadOnlyDictionary<string, IReadOnlyList<RuntimeTelemetryRecorder.AllocatorTelemetrySample>> allocators,
-        IReadOnlyDictionary<string, IReadOnlyList<RuntimeTelemetryRecorder.JobSystemTelemetrySample>> jobSystems)
+        IReadOnlyDictionary<string, IReadOnlyList<RuntimeTelemetryRecorder.JobSystemTelemetrySample>> jobSystems,
+        PlatformDiagnosticSnapshot? platform = null,
+        MemoryStatistics? memory = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        DateTimeOffset? exportedAt = null)
     {
         Frames = frames ?? throw new ArgumentNullException(nameof(frames));
         Allocators = allocators ?? throw new ArgumentNullException(nameof(allocators));
         JobSystems = jobSystems ?? throw new ArgumentNullException(nameof(jobSystems));
+        Platform = platform;
+        Memory = memory;
+        Metadata = metadata ?? new Dictionary<string, string>(StringComparer.Ordinal);
+        ExportedAt = exportedAt ?? DateTimeOffset.UtcNow;
     }
 
     public IReadOnlyList<RuntimeTelemetryRecorder.FrameTimingSample> Frames { get; }
@@ -24,6 +33,14 @@ public sealed class RuntimeTelemetryExport
     public IReadOnlyDictionary<string, IReadOnlyList<RuntimeTelemetryRecorder.AllocatorTelemetrySample>> Allocators { get; }
 
     public IReadOnlyDictionary<string, IReadOnlyList<RuntimeTelemetryRecorder.JobSystemTelemetrySample>> JobSystems { get; }
+
+    public PlatformDiagnosticSnapshot? Platform { get; }
+
+    public MemoryStatistics? Memory { get; }
+
+    public IReadOnlyDictionary<string, string> Metadata { get; }
+
+    public DateTimeOffset ExportedAt { get; }
 
     public string ToJson(bool indented = true)
     {
@@ -35,13 +52,46 @@ public sealed class RuntimeTelemetryExport
 
         var payload = new TelemetryPayload
         {
-            ExportedAt = DateTimeOffset.UtcNow,
+            ExportedAt = ExportedAt,
             Frames = Frames,
             Allocators = Allocators,
-            JobSystems = JobSystems
+            JobSystems = JobSystems,
+            Platform = Platform,
+            Memory = Memory,
+            Metadata = Metadata
         };
 
         return JsonSerializer.Serialize(payload, options);
+    }
+
+    public static RuntimeTelemetryExport FromJson(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            throw new ArgumentException("JSON content must be provided.", nameof(json));
+
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        var payload = JsonSerializer.Deserialize<TelemetryPayload>(json, options)
+                      ?? throw new InvalidOperationException("Failed to deserialize telemetry payload.");
+
+        var frames = payload.Frames ?? Array.Empty<RuntimeTelemetryRecorder.FrameTimingSample>();
+        var allocators = payload.Allocators ?? new Dictionary<string, IReadOnlyList<RuntimeTelemetryRecorder.AllocatorTelemetrySample>>(StringComparer.Ordinal);
+        var jobSystems = payload.JobSystems ?? new Dictionary<string, IReadOnlyList<RuntimeTelemetryRecorder.JobSystemTelemetrySample>>(StringComparer.Ordinal);
+        var metadata = payload.Metadata ?? new Dictionary<string, string>(StringComparer.Ordinal);
+
+        return new RuntimeTelemetryExport(frames, allocators, jobSystems, payload.Platform, payload.Memory, metadata, payload.ExportedAt);
+    }
+
+    public static RuntimeTelemetryExport FromFile(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            throw new ArgumentException("File path must be provided.", nameof(path));
+
+        var json = System.IO.File.ReadAllText(path);
+        return FromJson(json);
     }
 
     public TelemetryCsvExport ToCsv()
@@ -153,13 +203,21 @@ public sealed class RuntimeTelemetryExport
     {
         public DateTimeOffset ExportedAt { get; set; }
 
-        public IReadOnlyList<RuntimeTelemetryRecorder.FrameTimingSample> Frames { get; set; } = Array.Empty<RuntimeTelemetryRecorder.FrameTimingSample>();
+        public IReadOnlyList<RuntimeTelemetryRecorder.FrameTimingSample>? Frames { get; set; }
+            = Array.Empty<RuntimeTelemetryRecorder.FrameTimingSample>();
 
-        public IReadOnlyDictionary<string, IReadOnlyList<RuntimeTelemetryRecorder.AllocatorTelemetrySample>> Allocators { get; set; }
+        public IReadOnlyDictionary<string, IReadOnlyList<RuntimeTelemetryRecorder.AllocatorTelemetrySample>>? Allocators { get; set; }
             = new Dictionary<string, IReadOnlyList<RuntimeTelemetryRecorder.AllocatorTelemetrySample>>();
 
-        public IReadOnlyDictionary<string, IReadOnlyList<RuntimeTelemetryRecorder.JobSystemTelemetrySample>> JobSystems { get; set; }
+        public IReadOnlyDictionary<string, IReadOnlyList<RuntimeTelemetryRecorder.JobSystemTelemetrySample>>? JobSystems { get; set; }
             = new Dictionary<string, IReadOnlyList<RuntimeTelemetryRecorder.JobSystemTelemetrySample>>();
+
+        public PlatformDiagnosticSnapshot? Platform { get; set; }
+
+        public MemoryStatistics? Memory { get; set; }
+
+        public IReadOnlyDictionary<string, string>? Metadata { get; set; }
+            = new Dictionary<string, string>(StringComparer.Ordinal);
     }
 }
 

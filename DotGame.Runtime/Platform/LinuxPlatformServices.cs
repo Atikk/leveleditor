@@ -9,7 +9,7 @@ using DotGame.Core.Timing;
 
 namespace DotGame.Runtime.Platform;
 
-public sealed class WindowsPlatformServices : IPlatformServices
+public sealed class LinuxPlatformServices : IPlatformServices
 {
     private readonly IFileSystem fileSystem;
     private readonly IThreadServices threadServices;
@@ -18,14 +18,14 @@ public sealed class WindowsPlatformServices : IPlatformServices
     private readonly IMemoryServices memoryServices;
     private readonly IDiagnosticServices diagnosticServices;
 
-    public WindowsPlatformServices()
+    public LinuxPlatformServices()
     {
         timeSource = new HighResolutionTimeSource();
-        fileSystem = new WindowsFileSystem();
-        threadServices = new WindowsThreadServices();
-        windowServices = new WindowsWindowServices();
-        memoryServices = new WindowsMemoryServices();
-        diagnosticServices = new WindowsDiagnosticServices();
+        fileSystem = new LinuxFileSystem();
+        threadServices = new LinuxThreadServices();
+        windowServices = new LinuxWindowServices();
+        memoryServices = new LinuxMemoryServices();
+        diagnosticServices = new LinuxDiagnosticServices();
     }
 
     public IFileSystem FileSystem => fileSystem;
@@ -40,7 +40,7 @@ public sealed class WindowsPlatformServices : IPlatformServices
 
     public IDiagnosticServices Diagnostics => diagnosticServices;
 
-    private sealed class WindowsFileSystem : IFileSystem
+    private sealed class LinuxFileSystem : IFileSystem
     {
         public bool FileExists(string path) => File.Exists(path);
 
@@ -76,7 +76,7 @@ public sealed class WindowsPlatformServices : IPlatformServices
         }
     }
 
-    private sealed class WindowsThreadServices : IThreadServices
+    private sealed class LinuxThreadServices : IThreadServices
     {
         public int ProcessorCount => Environment.ProcessorCount;
 
@@ -122,18 +122,18 @@ public sealed class WindowsPlatformServices : IPlatformServices
         }
     }
 
-    private sealed class WindowsWindowServices : IWindowServices
+    private sealed class LinuxWindowServices : IWindowServices
     {
         public bool IsSupported => false;
 
         public IPlatformWindow CreateWindow(WindowDescriptor descriptor)
         {
-            throw new PlatformNotSupportedException("Window creation has not been implemented for Windows platform services yet.");
+            throw new PlatformNotSupportedException("Window creation has not been implemented for Linux platform services yet.");
         }
 
         public void DestroyWindow(IPlatformWindow window)
         {
-            throw new PlatformNotSupportedException("Window management has not been implemented for Windows platform services yet.");
+            throw new PlatformNotSupportedException("Window management has not been implemented for Linux platform services yet.");
         }
 
         public void PumpEvents(TimeSpan maxDuration)
@@ -142,7 +142,7 @@ public sealed class WindowsPlatformServices : IPlatformServices
         }
     }
 
-    private sealed class WindowsMemoryServices : IMemoryServices
+    private sealed class LinuxMemoryServices : IMemoryServices
     {
         public int PageSizeBytes => Environment.SystemPageSize;
 
@@ -154,7 +154,7 @@ public sealed class WindowsPlatformServices : IPlatformServices
         }
     }
 
-    private sealed class WindowsDiagnosticServices : IDiagnosticServices
+    private sealed class LinuxDiagnosticServices : IDiagnosticServices
     {
         public PlatformDiagnosticSnapshot CaptureSnapshot()
         {

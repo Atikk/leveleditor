@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using global::Avalonia;
@@ -28,6 +29,8 @@ using Dotgame.Avalonia.Controls;
 using global::Avalonia.Threading;
 using DotGame.Core.Async;
 using DotGame.Core.Async.Jobs;
+using DotGame.Core.Diagnostics;
+using DotGame.Runtime.Diagnostics;
 using DotGame.Core.Logging;
 using DotGame.Core.Resources;
 using Dotgame.Avalonia.MonoGameLayer;
@@ -469,6 +472,160 @@ namespace Dotgame.Avalonia.Views
             }
         }
 
+        private sealed class TelemetryMetadataEntry
+        {
+            public TelemetryMetadataEntry(string key, string value)
+            {
+                Key = key;
+                Value = value;
+                Display = string.IsNullOrWhiteSpace(value) ? key : $"{key}: {value}";
+            }
+
+            public string Key { get; }
+
+            public string Value { get; }
+
+            public string Display { get; }
+        }
+
+        private sealed class TelemetryJobSummaryViewModel
+        {
+            public TelemetryJobSummaryViewModel(string name, int samples, double pendingAverage, int pendingPeak, double activeAverage, int activePeak, int configuredWorkers, int completedFinal)
+            {
+                Name = name;
+                Samples = samples;
+                PendingAverage = pendingAverage;
+                PendingPeak = pendingPeak;
+                ActiveAverage = activeAverage;
+                ActivePeak = activePeak;
+                ConfiguredWorkers = configuredWorkers;
+                CompletedFinal = completedFinal;
+                Summary = $"{name}: samples={samples}, pending(avg={pendingAverage:F3}, max={pendingPeak}), active(avg={activeAverage:F3}, peak={activePeak}), configured={configuredWorkers}, completed={completedFinal}";
+            }
+
+            public string Name { get; }
+
+            public int Samples { get; }
+
+            public double PendingAverage { get; }
+
+            public int PendingPeak { get; }
+
+            public double ActiveAverage { get; }
+
+            public int ActivePeak { get; }
+
+            public int ConfiguredWorkers { get; }
+
+            public int CompletedFinal { get; }
+
+            public string Summary { get; }
+        }
+
+        private sealed class TelemetrySessionViewModel
+        {
+            public TelemetrySessionViewModel(string sessionName, RuntimeTelemetryExport export, TelemetryJobSystemSelection jobSystem, DeterministicTelemetrySession.TelemetryExportResult files)
+            {
+                SessionName = sessionName;
+                ExportedAt = export.ExportedAt;
+                JsonPath = files.JsonPath;
+                Metadata = BuildMetadata(export.Metadata);
+                Jobs = BuildJobs(export.JobSystems);
+                HasMetadata = Metadata.Count > 0;
+                HasJobs = Jobs.Count > 0;
+                Header = $"{sessionName} • {ExportedAt.ToLocalTime():yyyy-MM-dd HH:mm:ss}";
+                Summary = BuildSummary(jobSystem, export);
+            }
+
+            public string SessionName { get; }
+
+            public DateTimeOffset ExportedAt { get; }
+
+            public string JsonPath { get; }
+
+            public string Header { get; }
+
+            public string Summary { get; }
+
+            public IReadOnlyList<TelemetryMetadataEntry> Metadata { get; }
+
+            public IReadOnlyList<TelemetryJobSummaryViewModel> Jobs { get; }
+
+            public bool HasMetadata { get; }
+
+            public bool HasJobs { get; }
+
+            private static List<TelemetryMetadataEntry> BuildMetadata(IReadOnlyDictionary<string, string> metadata)
+            {
+                var entries = new List<TelemetryMetadataEntry>(metadata.Count);
+                foreach (var pair in metadata.OrderBy(static p => p.Key, StringComparer.OrdinalIgnoreCase))
+                {
+                    entries.Add(new TelemetryMetadataEntry(pair.Key, pair.Value));
+                }
+
+                return entries;
+            }
+
+            private static List<TelemetryJobSummaryViewModel> BuildJobs(IReadOnlyDictionary<string, IReadOnlyList<RuntimeTelemetryRecorder.JobSystemTelemetrySample>> jobSystems)
+            {
+                var results = new List<TelemetryJobSummaryViewModel>(jobSystems.Count);
+                foreach (var pair in jobSystems.OrderBy(static p => p.Key, StringComparer.OrdinalIgnoreCase))
+                {
+                    var samples = pair.Value;
+                    if (samples == null || samples.Count == 0)
+                        continue;
+
+                    results.Add(ComputeSummary(pair.Key, samples));
+                }
+
+                return results;
+            }
+
+            private static TelemetryJobSummaryViewModel ComputeSummary(string name, IReadOnlyList<RuntimeTelemetryRecorder.JobSystemTelemetrySample> samples)
+            {
+                double pendingSum = 0;
+                double activeSum = 0;
+                var pendingPeak = 0;
+                var activePeak = 0;
+
+                for (var i = 0; i < samples.Count; i++)
+                {
+                    var sample = samples[i];
+                    pendingSum += sample.PendingJobs;
+                    activeSum += sample.ActiveWorkers;
+                    if (sample.PendingJobs > pendingPeak)
+                        pendingPeak = sample.PendingJobs;
+                    if (sample.ActiveWorkers > activePeak)
+                        activePeak = sample.ActiveWorkers;
+                }
+
+                var pendingAverage = pendingSum / samples.Count;
+                var activeAverage = activeSum / samples.Count;
+                var last = samples[^1];
+
+                return new TelemetryJobSummaryViewModel(
+                    name,
+                    samples.Count,
+                    pendingAverage,
+                    pendingPeak,
+                    activeAverage,
+                    activePeak,
+                    last.ConfiguredWorkers,
+                    last.CompletedJobs);
+            }
+
+            private static string BuildSummary(TelemetryJobSystemSelection jobSystem, RuntimeTelemetryExport export)
+            {
+                var workerLabel = jobSystem.WorkerCount == 1 ? "worker" : "workers";
+                var platform = export.Platform.HasValue
+                    ? $"{export.Platform.Value.OperatingSystem} ({export.Platform.Value.ProcessArchitecture})"
+                    : jobSystem.Resolved;
+                var frameCount = export.Frames.Count;
+                var fallback = jobSystem.UsedFallback ? " (fallback)" : string.Empty;
+                return $"Captured {frameCount} frame{(frameCount == 1 ? string.Empty : "s")} on {platform} using '{jobSystem.Resolved}'{fallback} ({jobSystem.WorkerCount} {workerLabel}).";
+            }
+        }
+
         private readonly List<TileEntry> tiles = new();
         private TileEntry? selectedTile;
         private Bitmap? spriteSheetImage;
@@ -482,6 +639,8 @@ namespace Dotgame.Avalonia.Views
     private readonly ObservableCollection<GameDataEntrySummary> questSummaries = new();
     private readonly ObservableCollection<GameDataEntrySummary> cutsceneSummaries = new();
     private readonly ObservableCollection<LogEntryViewModel> logEntries = new();
+    private readonly ObservableCollection<TelemetrySessionViewModel> telemetrySessions = new();
+    private readonly DeterministicTelemetryCaptureService telemetryCaptureService = new();
     private readonly ILogger logger = LogManager.GetLogger<EditorWindow>();
         private int activeLayerIndex;
         private bool isMouseDown;
@@ -497,6 +656,9 @@ namespace Dotgame.Avalonia.Views
         private readonly EventHandler resourcePumpHandler;
     private bool gameDataLoaded;
     private bool usingFallbackPreviewMap;
+        private bool telemetryCaptureInProgress;
+    private Border? diagnosticsPanel;
+    private Button? diagnosticsToggleButton;
 
         private Canvas? mapCanvas;
         private WrapPanel? tilePalette;
@@ -551,6 +713,8 @@ namespace Dotgame.Avalonia.Views
     private ListBox? dialogueList;
     private ListBox? questList;
     private ListBox? cutsceneList;
+    private ItemsControl? telemetrySessionsList;
+    private TextBlock? telemetryStatusText;
         private double zoomLevel = 1.0;
         private bool suppressToolToggle;
         private bool suppressLayerSelection;
@@ -1165,6 +1329,11 @@ namespace Dotgame.Avalonia.Views
             dialogueList = this.FindControl<ListBox>("DialogueList");
             questList = this.FindControl<ListBox>("QuestList");
             cutsceneList = this.FindControl<ListBox>("CutsceneList");
+            telemetrySessionsList = this.FindControl<ItemsControl>("TelemetrySessionsList");
+            telemetryStatusText = this.FindControl<TextBlock>("TelemetryStatusText");
+            diagnosticsPanel = this.FindControl<Border>("DiagnosticsPanel");
+            diagnosticsToggleButton = this.FindControl<Button>("BtnDiagnosticsToggle");
+            var btnCloseDiagnostics = this.FindControl<Button>("BtnCloseDiagnostics");
 
             if (runtimePreviewHost != null)
             {
@@ -1199,6 +1368,7 @@ namespace Dotgame.Avalonia.Views
             var btnLoadMap = this.FindControl<Button>("BtnLoadMap");
             var btnMonoGamePreview = this.FindControl<Button>("BtnMonoGamePreview");
             var btnReloadGameData = this.FindControl<Button>("BtnReloadGameData");
+            var btnCaptureTelemetry = this.FindControl<Button>("BtnCaptureTelemetry");
             var btnSpriteEditor = this.FindControl<Button>("BtnSpriteEditor");
             var btnTileSelect = this.FindControl<Button>("BtnTileSelect");
             var btnTileFill = this.FindControl<Button>("BtnTileFill");
@@ -1225,6 +1395,12 @@ namespace Dotgame.Avalonia.Views
                 btnMonoGamePreview.Click += BtnMonoGamePreview_Click;
             if (btnReloadGameData != null)
                 btnReloadGameData.Click += BtnReloadGameData_Click;
+            if (btnCaptureTelemetry != null)
+                btnCaptureTelemetry.Click += BtnCaptureTelemetry_Click;
+            if (diagnosticsToggleButton != null)
+                diagnosticsToggleButton.Click += (_, _) => ToggleDiagnosticsPanel();
+            if (btnCloseDiagnostics != null)
+                btnCloseDiagnostics.Click += (_, _) => ToggleDiagnosticsPanel(false);
             if (btnSpriteEditor != null)
                 btnSpriteEditor.Click += BtnSpriteEditor_Click;
             if (btnTileSelect != null)
@@ -1297,6 +1473,9 @@ namespace Dotgame.Avalonia.Views
 
             if (historyList != null)
                 historyList.ItemsSource = historyEntries;
+
+            if (telemetrySessionsList != null)
+                telemetrySessionsList.ItemsSource = telemetrySessions;
 
             if (characterList != null)
             {
@@ -4094,6 +4273,160 @@ namespace Dotgame.Avalonia.Views
             if (!suppressPreviewUpdate && !(usingFallbackPreviewMap && fallbackStillRequired))
             {
                 NotifyPreviewMapUpdate();
+            }
+        }
+
+        private void ToggleDiagnosticsPanel(bool? visible = null)
+        {
+            if (diagnosticsPanel == null)
+                return;
+
+            var shouldShow = visible ?? !diagnosticsPanel.IsVisible;
+            diagnosticsPanel.IsVisible = shouldShow;
+        }
+
+        private async void BtnCaptureTelemetry_Click(object? sender, RoutedEventArgs e)
+        {
+            if (telemetryCaptureInProgress)
+            {
+                PushHistory("Telemetry capture already running.");
+                UpdateTelemetryStatus("Telemetry capture already in progress.");
+                return;
+            }
+
+            telemetryCaptureInProgress = true;
+            var captureButton = sender as Button;
+            if (captureButton != null)
+                captureButton.IsEnabled = false;
+
+            UpdateTelemetryStatus("Capturing telemetry snapshot...");
+
+            try
+            {
+                var metadata = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["editor.preview.fallbackMap"] = usingFallbackPreviewMap ? "true" : "false",
+                    ["editor.layers"] = layers.Count.ToString(CultureInfo.InvariantCulture),
+                    ["editor.jobSystem.active"] = jobSystemActivation.Resolved
+                };
+
+                if (!string.IsNullOrWhiteSpace(map.SourceDirectory))
+                    metadata["editor.map.sourceDirectory"] = map.SourceDirectory!;
+
+                var headlessOptions = new HeadlessRuntimeOptions(
+                    frameCount: 300,
+                    jobsPerFrame: 96,
+                    jobIterations: 8,
+                    innerLoopIterations: 256,
+                    batchSize: 1,
+                    targetFrameRate: 60.0,
+                    seed: Environment.TickCount,
+                    maxConcurrentJobs: Math.Max(0, jobSystemActivation.WorkerCount * 2),
+                    sampleStatistics: false);
+
+                var request = new TelemetryCaptureRequest
+                {
+                    SessionPrefix = "editor",
+                    SessionSuffix = jobSystemActivation.Resolved,
+                    JobSystemIdentifier = jobSystemActivation.Resolved,
+                    WorkerCountOverride = jobSystemActivation.WorkerCount,
+                    Metadata = metadata,
+                    HeadlessOptions = headlessOptions
+                };
+
+                var result = await telemetryCaptureService
+                    .CaptureAsync(request, CancellationToken.None)
+                    .ConfigureAwait(false);
+
+                ApplyTelemetryCaptureResult(result);
+                PushHistory($"Telemetry captured -> {result.Files.JsonPath}");
+            }
+            catch (OperationCanceledException)
+            {
+                PushHistory("Telemetry capture cancelled.");
+                UpdateTelemetryStatus("Telemetry capture cancelled.");
+            }
+            catch (Exception ex)
+            {
+                var message = $"Telemetry capture failed: {ex.Message}";
+                PushHistory(message);
+                UpdateTelemetryStatus(message);
+            }
+            finally
+            {
+                telemetryCaptureInProgress = false;
+                if (captureButton != null)
+                    Dispatcher.UIThread.Post(() => captureButton.IsEnabled = true);
+            }
+        }
+
+        private void ApplyTelemetryCaptureResult(TelemetryCaptureResult result)
+        {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                Dispatcher.UIThread.Post(() => ApplyTelemetryCaptureResult(result));
+                return;
+            }
+
+            var viewModel = new TelemetrySessionViewModel(result.SessionName, result.Export, result.JobSystem, result.Files);
+            telemetrySessions.Insert(0, viewModel);
+            while (telemetrySessions.Count > 5)
+                telemetrySessions.RemoveAt(telemetrySessions.Count - 1);
+
+            var fileName = IOPath.GetFileName(result.Files.JsonPath);
+            UpdateTelemetryStatus($"Telemetry exported: {fileName}");
+        }
+
+        private void UpdateTelemetryStatus(string message)
+        {
+            if (telemetryStatusText == null)
+                return;
+
+            void Apply()
+            {
+                telemetryStatusText.Text = message ?? string.Empty;
+            }
+
+            if (Dispatcher.UIThread.CheckAccess())
+                Apply();
+            else
+                Dispatcher.UIThread.Post(Apply);
+        }
+
+        private void TelemetryOpenJsonButton_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not Button button)
+                return;
+
+            var path = button.Tag as string;
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                UpdateTelemetryStatus("Telemetry JSON path unavailable.");
+                return;
+            }
+
+            if (!File.Exists(path))
+            {
+                var message = $"Telemetry JSON not found: {path}";
+                PushHistory(message);
+                UpdateTelemetryStatus(message);
+                return;
+            }
+
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = path,
+                    UseShellExecute = true
+                };
+                Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                var message = $"Failed to open telemetry JSON: {ex.Message}";
+                PushHistory(message);
+                UpdateTelemetryStatus(message);
             }
         }
 

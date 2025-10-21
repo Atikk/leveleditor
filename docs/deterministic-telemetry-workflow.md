@@ -36,9 +36,11 @@ Use `scripts\collect-job-system-telemetry.ps1` to execute deterministic runtime 
   - `-DisableHeadless` — opt out of the headless harness and run the full MonoGame window (requires a GPU/display).
   - `-HeadlessFrames`, `-HeadlessJobsPerFrame`, `-HeadlessJobIterations`, `-HeadlessInnerLoopIterations`, `-HeadlessBatchSize` — tune the deterministic workload. The script exports these values via `DOTGAME_RUNTIME_HEADLESS_*` variables for the runtime to consume.
 - `-Configuration Release` — run release builds if profiling final numbers.
+- `-RuntimeIdentifier linux-x64` — cross-compile/publish for a specific runtime before running the sweep (use `osx-arm64` on macOS, etc.).
+- `-PlatformServices linux` — select the platform services implementation exposed via `DOTGAME_PLATFORM_IMPLEMENTATION`. Values: `windows`, `linux`, `mac` (defaults to `windows`).
 - `-NoBuild` — skip the build if the artifacts are already up to date.
 
-Each run produces JSON + CSV exports per session beneath the output directory. Environment variables are restored to previous values once the script completes.
+Each run produces JSON + CSV exports per session beneath the output directory. The JSON payload now includes `platform` (OS/architecture/runtime uptime), `memory` (working set, private bytes, managed heap), and a `metadata` map capturing resolved configuration (platform identifier, job system selection, worker count, headless options). Environment variables are restored to previous values once the script completes. Publish profile details live in `docs/runtime-publishing.md` if you need prebuilt artifacts instead of `dotnet run`.
 
 The sweep script enables the headless deterministic harness by default (`DOTGAME_RUNTIME_HEADLESS=1`), so no graphics device is required on CI agents. Use `-DisableHeadless` when you need to profile the full MonoGame surface locally.
 
@@ -55,10 +57,19 @@ Sample console output:
 
 ```
 Session: 20251019-qa-w2-async
+  meta[platform.resolved] = windows
+  meta[jobSystem.resolved] = async
+  meta[jobSystem.workers] = 2
   async: samples=3600, pending(avg=1.245, max=9), active(avg=0.742, peak=2), configured=2, completedFinal=10800
 Session: 20251019-qa-w4-workstealing
+  meta[platform.resolved] = windows
+  meta[jobSystem.resolved] = workstealing
+  meta[jobSystem.workers] = 4
   workstealing: samples=3600, pending(avg=0.842, max=5), active(avg=1.441, peak=4), configured=4, completedFinal=10800
 Session: 20251019-qa-w4-bifurcated
+  meta[platform.resolved] = windows
+  meta[jobSystem.resolved] = bifurcated
+  meta[jobSystem.workers] = 4
   bifurcated: samples=3600, pending(avg=1.014, max=7), active(avg=1.219, peak=3), configured=4, completedFinal=10800
 ```
 
