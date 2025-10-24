@@ -1,9 +1,11 @@
 ﻿using global::Avalonia;
 using global::Avalonia.Media;
+using DotGame.Core;
 
-namespace DotGame.Core;
+namespace Dotgame.Avalonia.Legacy;
 
-public class TriggerMode : IEditorMode
+[System.Obsolete("Legacy UI-side copy of TriggerMode. Use DotGame.Core.TriggerMode in DotGame.Core instead.")]
+public sealed class TriggerMode
 {
     public void OnPointerDown(Point pos)
     {

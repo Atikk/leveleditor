@@ -37,7 +37,7 @@ namespace Dotgame.Avalonia.Assets
             var ms = new MemoryStream();
             data.SaveTo(ms);
             ms.Position = 0;
-            return new Bitmap(ms);
+            return Dotgame.Avalonia.Models.AssetManager.Instance.LoadBitmapFromStream(ms);
         }
     }
 }

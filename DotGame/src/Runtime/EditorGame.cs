@@ -21,6 +21,21 @@ namespace Dotgame.Avalonia.MonoGameLayer
 {
 	public sealed class EditorGame : Game
 	{
+
+		// Optional input provider used to source keyboard/mouse state from the
+		// hosting environment (Avalonia) instead of relying solely on MonoGame's
+		// platform input. Tests and the preview host can set this to forward
+		// Avalonia events.
+		public interface IEditorInputProvider
+		{
+			Microsoft.Xna.Framework.Input.KeyboardState GetKeyboardState();
+			Microsoft.Xna.Framework.Input.MouseState GetMouseState();
+			// Mouse currently falls back to MonoGame's Mouse.GetState(); add here if
+			// future forwarding is required.
+		}
+
+		public IEditorInputProvider? InputProvider { get; set; }
+
 		private readonly GraphicsDeviceManager _graphics;
 		private readonly ITextureResolver? _resolverOverride;
 		private readonly AsyncTaskScheduler _scheduler;
@@ -150,8 +165,8 @@ namespace Dotgame.Avalonia.MonoGameLayer
 			{
 				_resourceManager.PumpMainThread();
 				ApplyPendingMapSwap();
-				var keyboard = Keyboard.GetState();
-				var mouse = Mouse.GetState();
+				var keyboard = InputProvider?.GetKeyboardState() ?? Keyboard.GetState();
+				var mouse = InputProvider?.GetMouseState() ?? Mouse.GetState();
 				UpdatePlayerCombat(gameTime, keyboard);
 				UpdateRangedEnemyAttack(gameTime);
 				UpdatePlayerMovement(keyboard);

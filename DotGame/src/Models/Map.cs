@@ -21,6 +21,7 @@ namespace Dotgame.Avalonia.Models
 
         private string?[,] tiles = default!;
         private int?[,]? tileIds;
+    private bool[,]? passability;
         private readonly Dictionary<string, SKBitmap> imageCache = new(StringComparer.Ordinal);
         private readonly Dictionary<string, SKBitmap> atlasCache = new(StringComparer.Ordinal);
         public WriteableBitmap? Composite { get; private set; }
@@ -106,9 +107,35 @@ namespace Dotgame.Avalonia.Models
             map.tileIds = tileIdBuffer;
             map.ExternalTileMapAsset = obj.externalTileMapAsset;
 
+            // Load passability grid if present and dimensions match
+            if (obj is not null)
+            {
+                if (obj.passability != null && obj.passability.Length == obj.rows)
+                {
+                    try
+                    {
+                        var pb = new bool[obj.rows, obj.cols];
+                        for (int y = 0; y < obj.rows; y++)
+                        {
+                            var row = obj.passability[y];
+                            if (row == null) continue;
+                            for (int x = 0; x < Math.Min(obj.cols, row.Length); x++)
+                            {
+                                pb[y, x] = row[x];
+                            }
+                        }
+                        map.passability = pb;
+                    }
+                    catch
+                    {
+                        // ignore malformed passability data
+                    }
+                }
+            }
+
             if (obj.characters != null)
             {
-                foreach (var charDto in obj.characters)
+                foreach (var charDto in obj.characters!)
                 {
                     var character = new Character(charDto.TileX, charDto.TileY, charDto.Class, charDto.Name)
                     {
@@ -132,7 +159,7 @@ namespace Dotgame.Avalonia.Models
 
             if (obj.doodads != null)
             {
-                foreach (var doodadDto in obj.doodads)
+                foreach (var doodadDto in obj.doodads!)
                 {
                     var doodad = new Doodad(doodadDto.TileX, doodadDto.TileY, doodadDto.Type)
                     {
@@ -160,7 +187,178 @@ namespace Dotgame.Avalonia.Models
             map.ExternalTileMapAsset = obj.externalTileMapAsset;
             if (obj.triggers != null)
             {
-                foreach (var triggerDto in obj.triggers)
+                foreach (var triggerDto in obj.triggers!)
+                {
+                    var trigger = new BehaviorTrigger
+                    {
+                        TileX = triggerDto.TileX,
+                        TileY = triggerDto.TileY,
+                        Name = triggerDto.Name ?? string.Empty
+                    };
+                    map.AddTrigger(trigger);
+                }
+            }
+            map.BuildComposite();
+            return map;
+        }
+
+        /// <summary>
+        /// Load a Map from a JSON string in-memory. This mirrors <see cref="LoadFromJson(string)"/>
+        /// but avoids filesystem IO so callers can supply raw JSON directly.
+        /// </summary>
+        /// <param name="json">The JSON payload representing the map.</param>
+        /// <param name="baseDirectory">Optional base directory used to resolve relative asset paths.</param>
+        public static Map LoadFromJsonString(string json, string? baseDirectory = null)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                throw new ArgumentException("json must be non-empty", nameof(json));
+
+            var obj = JsonSerializer.Deserialize<MapDto>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? throw new InvalidDataException("Invalid map JSON.");
+
+            if (obj.cols <= 0 || obj.rows <= 0 || obj.tileW <= 0 || obj.tileH <= 0)
+                throw new InvalidDataException("Map is missing required fields (cols/rows/tileW/tileH).");
+
+            var tileMatrix = ResolveTileMatrix(obj);
+            if (tileMatrix is null)
+                throw new InvalidDataException("Map JSON is missing tile data; expected 'map' or 'layers[].tiles'.");
+
+            var map = new Map
+            {
+                Cols = obj.cols,
+                Rows = obj.rows,
+                TileW = obj.tileW,
+                TileH = obj.tileH,
+                tiles = new string?[obj.rows, obj.cols],
+                tileIds = null,
+                sourceDirectory = baseDirectory
+            };
+
+            map.Tileset = CreateTileset(obj.tileset, baseDirectory, obj.tileW, obj.tileH);
+
+            int?[,]? tileIdBuffer = null;
+            for (int y = 0; y < obj.rows; y++)
+            {
+                var row = y < tileMatrix.Length ? tileMatrix[y] : null;
+                for (int x = 0; x < obj.cols; x++)
+                {
+                    if (row == null || x >= row.Length)
+                        continue;
+
+                    var element = row[x];
+                    if (element.ValueKind == JsonValueKind.Null || element.ValueKind == JsonValueKind.Undefined)
+                        continue;
+
+                    if (element.ValueKind == JsonValueKind.String)
+                    {
+                        map.tiles[y, x] = element.GetString();
+                    }
+                    else if (element.ValueKind == JsonValueKind.Number)
+                    {
+                        tileIdBuffer ??= new int?[obj.rows, obj.cols];
+                        if (element.TryGetInt32(out var id))
+                        {
+                            tileIdBuffer[y, x] = id;
+                        }
+                        else
+                        {
+                            var dbl = element.GetDouble();
+                            tileIdBuffer[y, x] = (int)Math.Round(dbl);
+                        }
+                    }
+                    else
+                    {
+                        throw new InvalidDataException($"Unsupported tile value type '{element.ValueKind}' at ({x},{y}).");
+                    }
+                }
+            }
+
+            map.tileIds = tileIdBuffer;
+            map.ExternalTileMapAsset = obj.externalTileMapAsset;
+
+            // Load passability grid if present and dimensions match
+            if (obj is not null)
+            {
+                if (obj.passability != null && obj.passability.Length == obj.rows)
+                {
+                    try
+                    {
+                        var pb = new bool[obj.rows, obj.cols];
+                        for (int y = 0; y < obj.rows; y++)
+                        {
+                            var row = obj.passability[y];
+                            if (row == null) continue;
+                            for (int x = 0; x < Math.Min(obj.cols, row.Length); x++)
+                            {
+                                pb[y, x] = row[x];
+                            }
+                        }
+                        map.passability = pb;
+                    }
+                    catch
+                    {
+                        // ignore malformed passability data
+                    }
+                }
+            }
+
+            if (obj.characters != null)
+            {
+                foreach (var charDto in obj.characters!)
+                {
+                    var character = new Character(charDto.TileX, charDto.TileY, charDto.Class, charDto.Name)
+                    {
+                        BehaviorScript = charDto.BehaviorScript,
+                        TriggerEvent = charDto.TriggerEvent
+                    };
+                    if (!string.IsNullOrWhiteSpace(charDto.Color))
+                    {
+                        try
+                        {
+                            character.Color = Color.Parse(charDto.Color);
+                        }
+                        catch
+                        {
+                            // ignore malformed color values
+                        }
+                    }
+                    map.characters.Add(character);
+                }
+            }
+
+            if (obj.doodads != null)
+            {
+                foreach (var doodadDto in obj.doodads!)
+                {
+                    var doodad = new Doodad(doodadDto.TileX, doodadDto.TileY, doodadDto.Type)
+                    {
+                        Collidable = doodadDto.Collidable,
+                        Interactable = doodadDto.Interactable,
+                        Animated = doodadDto.Animated,
+                        Trigger = doodadDto.Trigger,
+                        OnInteract = doodadDto.OnInteract
+                    };
+                    if (!string.IsNullOrWhiteSpace(doodadDto.Color))
+                    {
+                        try
+                        {
+                            doodad.Color = Color.Parse(doodadDto.Color);
+                        }
+                        catch
+                        {
+                            // ignore malformed color values
+                        }
+                    }
+                    map.doodads.Add(doodad);
+                }
+            }
+
+            map.ExternalTileMapAsset = obj.externalTileMapAsset;
+            if (obj.triggers != null)
+            {
+                foreach (var triggerDto in obj.triggers!)
                 {
                     var trigger = new BehaviorTrigger
                     {
@@ -183,7 +381,7 @@ namespace Dotgame.Avalonia.Models
         public string? GetTileDataUrl(int tx, int ty)
         {
             if (!InBounds(tx, ty)) return null;
-            return tiles[ty, tx];
+            return tiles![ty, tx];
         }
 
         public int? GetTileId(int tx, int ty)
@@ -192,6 +390,47 @@ namespace Dotgame.Avalonia.Models
                 return null;
 
             return tileIds[ty, tx];
+        }
+
+        // Returns true if the tile is passable (no collision). If passability grid is absent, defaults to true.
+        public bool IsTilePassable(int tx, int ty)
+        {
+            if (!InBounds(tx, ty)) return false;
+            if (passability == null) return true;
+            return passability[ty, tx];
+        }
+
+        // Allow external editors to set a passability grid. Expects dimensions [rows,cols] (y,x)
+        public void SetPassability(bool[,] grid)
+        {
+            if (grid == null) return;
+            if (grid.GetLength(0) != Rows || grid.GetLength(1) != Cols)
+                throw new ArgumentException("Passability grid dimensions must match map rows and cols.");
+
+            // convert from [rows,cols] to internal [rows,cols] layout but internal indexing is [y,x]
+            var pb = new bool[Rows, Cols];
+            for (int y = 0; y < Rows; y++)
+            {
+                for (int x = 0; x < Cols; x++)
+                {
+                    pb[y, x] = grid[y, x];
+                }
+            }
+            passability = pb;
+        }
+
+        // Return passability as jagged bool[y][x] where y = row
+        public bool[][]? GetPassabilityAsJagged()
+        {
+            if (passability == null) return null;
+            var result = new bool[Rows][];
+            for (int y = 0; y < Rows; y++)
+            {
+                result[y] = new bool[Cols];
+                for (int x = 0; x < Cols; x++)
+                    result[y][x] = passability[y, x];
+            }
+            return result;
         }
 
     public bool HasTileIds => tileIds != null && Tileset is not null;
@@ -270,7 +509,7 @@ namespace Dotgame.Avalonia.Models
             for (int y = 0; y < Rows; y++)
             {
                 for (int x = 0; x < Cols; x++)
-                    copy[y, x] = tiles?[y, x];
+                    copy[y, x] = tiles![y, x];
             }
 
             int?[,]? idCopy = null;
@@ -300,15 +539,15 @@ namespace Dotgame.Avalonia.Models
                 for (int y = 0; y < Rows; y++)
                 {
                     for (int x = 0; x < Cols; x++)
-                    {
-                        var url = tiles[y, x];
-                        if (!string.IsNullOrEmpty(url))
                         {
-                            var img = GetOrDecode(url!);
-                            var destRect = SKRect.Create(x * TileW, y * TileH, TileW, TileH);
-                            canvas.DrawBitmap(img, destRect);
+                            var url = tiles![y, x];
+                            if (!string.IsNullOrEmpty(url))
+                            {
+                                var img = GetOrDecode(url!);
+                                var destRect = SKRect.Create(x * TileW, y * TileH, TileW, TileH);
+                                canvas.DrawBitmap(img, destRect);
+                            }
                         }
-                    }
                 }
             }
 
@@ -391,8 +630,8 @@ namespace Dotgame.Avalonia.Models
                 var dispose = false;
                 if (File.Exists(key))
                 {
-                    bitmap = new Bitmap(key);
-                    dispose = true;
+                    bitmap = AssetManager.Instance.LoadBitmap(key);
+                    dispose = false; // AssetManager caches and manages instances
                 }
                 else
                 {
@@ -597,6 +836,7 @@ namespace Dotgame.Avalonia.Models
             public int tileW { get; set; }
             public int tileH { get; set; }
             public JsonElement[][]? map { get; set; }
+            public bool[][]? passability { get; set; }
             public List<MapLayerDto>? layers { get; set; }
             public int? activeLayerIndex { get; set; }
             public List<CharacterDto>? characters { get; set; }
@@ -625,9 +865,8 @@ namespace Dotgame.Avalonia.Models
             public int? firstId { get; set; }
             public int? tileWidth { get; set; }
             public int? tileHeight { get; set; }
-        }
-
-        private sealed class CharacterDto
+    }
+    private sealed class CharacterDto
         {
             public int TileX { get; set; }
             public int TileY { get; set; }

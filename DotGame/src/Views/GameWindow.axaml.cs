@@ -290,7 +290,7 @@ namespace Dotgame.Avalonia.Views
             var image = surface.Snapshot();
             var data = image.Encode(SKEncodedImageFormat.Png, 100);
             using var stream = new MemoryStream(data.ToArray());
-            var entityLayer = new Bitmap(stream);
+            var entityLayer = Dotgame.Avalonia.Models.AssetManager.Instance.LoadBitmapFromStream(stream);
             
             if (map == null)
             {

@@ -417,6 +417,11 @@
                                   Content="Show Grid" 
                                   IsChecked="True"
                                   FontWeight="Medium" />
+                        <CheckBox Name="PassabilityOverlayCheck"
+                                  Content="Show Collision"
+                                  IsChecked="True"
+                                  FontWeight="Medium"
+                                  Margin="4,6,0,0" />
                     </StackPanel>
                 </TabItem>
                 <TabItem Header="Properties">

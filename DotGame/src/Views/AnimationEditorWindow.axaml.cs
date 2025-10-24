@@ -177,7 +177,7 @@ namespace Dotgame.Avalonia.Views
             try
             {
                 using var stream = File.OpenRead(path);
-                spriteSheet = new Bitmap(stream);
+                spriteSheet = Dotgame.Avalonia.Models.AssetManager.Instance.LoadBitmapFromStream(stream);
                 spriteSheetPath = path;
                 StopPreview();
                 BuildFrameGrid();

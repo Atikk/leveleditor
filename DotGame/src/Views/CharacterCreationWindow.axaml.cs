@@ -110,7 +110,7 @@ namespace Dotgame.Avalonia.Views
 
                 try
                 {
-                    SelectedSprite = new Bitmap(spritePath);
+                    SelectedSprite = Dotgame.Avalonia.Models.AssetManager.Instance.LoadBitmap(spritePath);
                     if (imgPreview != null)
                         imgPreview.Source = SelectedSprite;
                 }

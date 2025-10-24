@@ -12,6 +12,10 @@ public partial class App : Application
         AvaloniaXamlLoader.Load(this);
     }
 
+    // Simple composition root accessor for small services used by views.
+    private static Dotgame.Avalonia.Services.ITileService? _tileService;
+    public static Dotgame.Avalonia.Services.ITileService TileService => _tileService ??= new Dotgame.Avalonia.Services.TileService();
+
     public override void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)

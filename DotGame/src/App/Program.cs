@@ -17,8 +17,37 @@ class Program
         EnsurePlatformServices();
 
         using var logging = LoggingBootstrapper.Initialize();
-        BuildAvaloniaApp()
-            .StartWithClassicDesktopLifetime(args);
+
+        // Log application lifecycle events (startup/shutdown)
+        var logger = DotGame.Core.Logging.LogManager.GetLogger("App.Program");
+        logger.Info("DotGame Avalonia application starting");
+
+        try
+        {
+            // Register platform/application services that may be resolved by UI components.
+            try
+            {
+                // Register a default tile service implementation for composition roots and tests.
+                var defaultTileService = new Dotgame.Avalonia.Services.TileService();
+                // Register the UI interface (old) for backward compatibility
+                DotGame.Core.Platform.ServiceContainer.RegisterSingleton<Dotgame.Avalonia.Services.ITileService>(defaultTileService);
+                // Also register using the new core interface so consumers can depend on DotGame.Core.Services.ITileService
+                DotGame.Core.Platform.ServiceContainer.RegisterSingleton<DotGame.Core.Services.ITileService>(new Dotgame.Avalonia.Services.Adapters.TileServiceAdapter(defaultTileService));
+                // Register preview adapter for core preview contract (lightweight adapter)
+                DotGame.Core.Platform.ServiceContainer.RegisterSingleton<DotGame.Core.Services.IPreviewService>(new Dotgame.Avalonia.Services.Adapters.MonoGamePreviewAdapter());
+            }
+            catch
+            {
+                // best-effort registration; continue even if tile service cannot be created at startup
+            }
+
+            BuildAvaloniaApp()
+                .StartWithClassicDesktopLifetime(args);
+        }
+        finally
+        {
+            logger.Info("DotGame Avalonia application exiting");
+        }
     }
 
     // Avalonia configuration, don't remove; also used by visual designer.

@@ -42,7 +42,7 @@ namespace Dotgame.Avalonia.Views
 
         private async void BtnEditor_Click(object? sender, RoutedEventArgs e)
         {
-            var editor = new EditorWindow();
+            var editor = new EditorWindow(App.TileService);
             await editor.ShowDialog(this);
         }
 

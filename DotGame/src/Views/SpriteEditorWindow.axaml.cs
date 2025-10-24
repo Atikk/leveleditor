@@ -1073,7 +1073,7 @@ namespace Dotgame.Avalonia.Views
             using var stream = new MemoryStream();
             data.SaveTo(stream);
             stream.Position = 0;
-            return new Bitmap(stream);
+            return Dotgame.Avalonia.Models.AssetManager.Instance.LoadBitmapFromStream(stream);
         }
 
         private async void BtnLoadSprite_Click(object? sender, RoutedEventArgs e)

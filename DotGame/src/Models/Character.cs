@@ -85,7 +85,7 @@ namespace Dotgame.Avalonia.Models
 
         public void LoadSprite(string path, int frameW = 32, int frameH = 32, int totalFrames = 1)
         {
-            Sprite = new Bitmap(path);
+            Sprite = Dotgame.Avalonia.Models.AssetManager.Instance.LoadBitmap(path);
             FrameWidth = frameW;
             FrameHeight = frameH;
             TotalFrames = Math.Max(1, totalFrames);
@@ -162,7 +162,7 @@ namespace Dotgame.Avalonia.Models
         {
             int nx = TileX + dx;
             int ny = TileY + dy;
-            if (map.InBounds(nx, ny))
+            if (map.InBounds(nx, ny) && map.IsTilePassable(nx, ny))
             {
                 TileX = nx;
                 TileY = ny;

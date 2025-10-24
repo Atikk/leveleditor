@@ -44,353 +44,88 @@ namespace Dotgame.Avalonia.Views
 {
     public partial class EditorWindow : Window
     {
-        private sealed class TileEntry
+
+        // Test hook: a minimal preview-game abstraction used by unit tests to
+        // exercise the map-request path without pulling in the full MonoGame
+        // runtime or UI stack.
+        public interface IPreviewGame
         {
-            public Bitmap Bitmap { get; }
-            public string? SourceKey { get; }
-            public string? DataUrl { get; }
-            public string? SerializedValueOverride { get; }
-            public int? TileId { get; }
-            public string? TilesetKey { get; }
+            void RequestMapSwap(Map mapSnapshot);
+        }
 
-            public TileEntry(
-                Bitmap bitmap,
-                string? sourceKey,
-                string? dataUrl = null,
-                string? serializedValueOverride = null,
-                int? tileId = null,
-                string? tilesetKey = null)
+        /// <summary>
+        /// Try to request a preview map swap on an arbitrary preview-game object.
+        /// This wraps the call in a safe try/catch so tests can assert the call
+        /// path completes without throwing.
+        /// </summary>
+        public static bool TryRequestPreviewMap(IPreviewGame previewGame, Map mapSnapshot, out string? errorMessage)
+        {
+            if (previewGame == null)
             {
-                Bitmap = bitmap;
-                SourceKey = sourceKey;
-                DataUrl = dataUrl;
-                SerializedValueOverride = serializedValueOverride;
-                TileId = tileId;
-                TilesetKey = tilesetKey;
-            }
-
-            public bool TryGetTileId(out int id)
-            {
-                if (TileId.HasValue)
-                {
-                    id = TileId.Value;
-                    return true;
-                }
-
-                id = default;
+                errorMessage = "previewGame was null";
                 return false;
             }
 
-            public string GetSerializedValue()
+            try
             {
-                if (TileId.HasValue)
-                    return TileId.Value.ToString(CultureInfo.InvariantCulture);
-
-                if (!string.IsNullOrWhiteSpace(SerializedValueOverride))
-                    return SerializedValueOverride!;
-
-                if (!string.IsNullOrWhiteSpace(SourceKey))
-                    return SourceKey!;
-
-                if (!string.IsNullOrEmpty(DataUrl))
-                    return DataUrl!;
-
-                using var ms = new System.IO.MemoryStream();
-                Bitmap.Save(ms);
-                var base64 = Convert.ToBase64String(ms.ToArray());
-                return "data:image/png;base64," + base64;
+                previewGame.RequestMapSwap(mapSnapshot ?? throw new ArgumentNullException(nameof(mapSnapshot)));
+                errorMessage = null;
+                return true;
             }
-
-            public object? GetSerializableValue(bool preferTileIds)
+            catch (Exception ex)
             {
-                if (preferTileIds && TileId.HasValue)
-                    return TileId.Value;
-
-                return GetSerializedValue();
-            }
-
-            public TileEntry Clone()
-            {
-                using var ms = new System.IO.MemoryStream();
-                Bitmap.Save(ms);
-                ms.Position = 0;
-                return new TileEntry(new Bitmap(ms), SourceKey, DataUrl, SerializedValueOverride, TileId, TilesetKey);
-            }
-
-            public static TileEntry FromDataUrl(string dataUrl)
-            {
-                int comma = dataUrl.IndexOf(',');
-                string base64 = comma >= 0 ? dataUrl[(comma + 1)..] : dataUrl;
-                byte[] bytes = Convert.FromBase64String(base64);
-                using var ms = new System.IO.MemoryStream(bytes);
-                return new TileEntry(new Bitmap(ms), null, dataUrl, dataUrl);
+                errorMessage = ex.Message;
+                return false;
             }
         }
 
-        private sealed class LayerState : INotifyPropertyChanged
+        /// <summary>
+        /// Test-only helper that mirrors the `NotifyPreviewMapUpdate` decision logic
+        /// (respecting a fallback-preview condition) and requests a map swap on the
+        /// provided preview-game abstraction. This enables unit tests to exercise
+        /// the codepath without creating an Avalonia window or a MonoGame runtime.
+        /// </summary>
+        public static bool NotifyPreviewMapUpdateForTest(IPreviewGame previewGame, Map mapSnapshot, bool usingFallbackPreviewMap, Func<bool> shouldUseFallbackPreviewMap, out string? errorMessage)
         {
-            private string name;
-            private bool isVisible = true;
-            private double opacity = 1.0;
-
-            public LayerState(string id, string name, TileEntry?[,] tiles)
+            if (previewGame == null)
             {
-                Id = id;
-                this.name = name;
-                Tiles = tiles;
+                errorMessage = "previewGame was null";
+                return false;
             }
 
-            public string Id { get; }
-
-            public string Name
+            if (shouldUseFallbackPreviewMap == null)
             {
-                get => name;
-                set
+                errorMessage = "shouldUseFallbackPreviewMap delegate was null";
+                return false;
+            }
+
+            try
+            {
+                if (usingFallbackPreviewMap && shouldUseFallbackPreviewMap())
                 {
-                    if (name != value)
-                    {
-                        name = value;
-                        OnPropertyChanged(nameof(Name));
-                    }
-                }
-            }
-
-            public bool IsVisible
-            {
-                get => isVisible;
-                set
-                {
-                    if (isVisible != value)
-                    {
-                        isVisible = value;
-                        OnPropertyChanged(nameof(IsVisible));
-                    }
-                }
-            }
-
-            public double Opacity
-            {
-                get => opacity;
-                set
-                {
-                    var clamped = Math.Clamp(value, 0.0, 1.0);
-                    if (Math.Abs(opacity - clamped) > double.Epsilon)
-                    {
-                        opacity = clamped;
-                        OnPropertyChanged(nameof(Opacity));
-                    }
-                }
-            }
-
-            public TileEntry?[,] Tiles { get; set; }
-
-            public event PropertyChangedEventHandler? PropertyChanged;
-
-            private void OnPropertyChanged(string propertyName)
-            {
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-            }
-
-            public override string ToString() => Name;
-        }
-
-        private sealed class TilesetState : IDisposable
-        {
-            private readonly TilesetReference reference;
-            private readonly Func<SKBitmap> atlasFactory;
-            private readonly Dictionary<int, TileEntry> paletteCache = new();
-            private SKBitmap? atlas;
-            private bool disposed;
-
-            private TilesetState(TilesetReference reference, Func<SKBitmap> atlasFactory)
-            {
-                this.reference = reference ?? throw new ArgumentNullException(nameof(reference));
-                this.atlasFactory = atlasFactory ?? throw new ArgumentNullException(nameof(atlasFactory));
-            }
-
-            public static TilesetState FromSpriteSheet(TilesetReference reference, Bitmap spriteSheet)
-            {
-                if (spriteSheet == null) throw new ArgumentNullException(nameof(spriteSheet));
-                return new TilesetState(reference, () => CloneToSkBitmap(spriteSheet));
-            }
-
-            public static TilesetState FromReference(TilesetReference reference)
-            {
-                return new TilesetState(reference, () => LoadSkBitmap(reference));
-            }
-
-            public TilesetReference Reference => reference;
-
-            public TileEntry CreateTileEntry(int tileId)
-            {
-                var baseEntry = GetOrCreatePaletteEntry(tileId);
-                return baseEntry.Clone();
-            }
-
-            public TileEntry GetPaletteEntry(int tileId)
-            {
-                return GetOrCreatePaletteEntry(tileId);
-            }
-
-            public IEnumerable<int> EnumerateTileIds()
-            {
-                var atlasBitmap = EnsureAtlas();
-                var columns = GetEffectiveColumns(atlasBitmap.Width);
-                if (columns <= 0)
-                    yield break;
-
-                var tileCount = reference.TileCount;
-                if (tileCount <= 0)
-                {
-                    var rows = GetEffectiveRows(columns, atlasBitmap.Height);
-                    tileCount = Math.Max(0, columns * rows);
+                    // The editor decided a fallback map is still required; do not
+                    // request a swap in this case.
+                    errorMessage = null;
+                    return false;
                 }
 
-                for (var i = 0; i < tileCount; i++)
-                    yield return reference.FirstId + i;
+                // Clone the map to mimic the editor behavior and request swap.
+                var snapshot = mapSnapshot?.Clone() ?? throw new ArgumentNullException(nameof(mapSnapshot));
+                previewGame.RequestMapSwap(snapshot);
+                errorMessage = null;
+                return true;
             }
-
-            public TilesetReference CreateReferenceForMap() => reference;
-
-            public object CreateSerializableDto(string? mapDirectory)
+            catch (Exception ex)
             {
-                var atlasBitmap = EnsureAtlas();
-                var columns = GetEffectiveColumns(atlasBitmap.Width);
-                var rows = GetEffectiveRows(columns, atlasBitmap.Height);
-                var tileCount = reference.TileCount > 0 ? reference.TileCount : columns * rows;
-                var texture = GetTextureKeyForSave(mapDirectory);
-
-                return new
-                {
-                    texture,
-                    columns,
-                    tileCount,
-                    margin = reference.Margin,
-                    spacing = reference.Spacing,
-                    firstId = reference.FirstId,
-                    tileWidth = reference.TileWidth,
-                    tileHeight = reference.TileHeight
-                };
-            }
-
-            public string GetTextureKeyForSave(string? mapDirectory)
-            {
-                var absolute = reference.AbsoluteTexturePath;
-                if (!string.IsNullOrWhiteSpace(mapDirectory) && !string.IsNullOrWhiteSpace(absolute))
-                {
-                    try
-                    {
-                        var rel = IOPath.GetRelativePath(mapDirectory, absolute);
-                        if (!string.IsNullOrWhiteSpace(rel) && !rel.StartsWith(".."))
-                            return rel.Replace('\\', '/');
-                    }
-                    catch
-                    {
-                        // fallback to texture key
-                    }
-                }
-
-                return reference.TextureKey;
-            }
-
-            public void Dispose()
-            {
-                if (disposed)
-                    return;
-
-                disposed = true;
-                if (atlas != null)
-                {
-                    atlas.Dispose();
-                    atlas = null;
-                }
-            }
-
-            private TileEntry GetOrCreatePaletteEntry(int tileId)
-            {
-                if (paletteCache.TryGetValue(tileId, out var cached))
-                    return cached;
-
-                var atlasBitmap = EnsureAtlas();
-                if (!reference.TryGetSourceRegion(tileId, atlasBitmap.Width, out var region))
-                    throw new InvalidOperationException($"Tileset '{reference.TextureKey}' does not contain tile id {tileId}.");
-
-                using var surface = SKSurface.Create(new SKImageInfo(region.Width, region.Height));
-                var srcRect = new SKRectI(region.X, region.Y, region.X + region.Width, region.Y + region.Height);
-                var destRect = new SKRectI(0, 0, region.Width, region.Height);
-                surface.Canvas.DrawBitmap(atlasBitmap, srcRect, destRect);
-                using var snapshot = surface.Snapshot();
-                using var data = snapshot.Encode(SKEncodedImageFormat.Png, 100);
-                using var ms = new MemoryStream(data.ToArray());
-                var bitmap = new Bitmap(ms);
-                var entry = new TileEntry(bitmap, null, tileId: tileId, tilesetKey: reference.TextureKey);
-                paletteCache[tileId] = entry;
-                return entry;
-            }
-
-            private SKBitmap EnsureAtlas()
-            {
-                if (atlas != null)
-                    return atlas;
-
-                atlas = atlasFactory();
-                if (atlas == null)
-                    throw new InvalidOperationException($"Failed to load tileset texture '{reference.TextureKey}'.");
-                return atlas;
-            }
-
-            private int GetEffectiveColumns(int atlasWidth)
-            {
-                if (reference.TileWidth <= 0)
-                    return 0;
-
-                if (reference.Columns > 0)
-                    return reference.Columns;
-
-                var denom = reference.TileWidth + reference.Spacing;
-                if (denom <= 0)
-                    return 0;
-
-                var usableWidth = atlasWidth - reference.Margin * 2 + reference.Spacing;
-                return Math.Max(1, usableWidth / denom);
-            }
-
-            private int GetEffectiveRows(int columns, int atlasHeight)
-            {
-                if (columns <= 0 || reference.TileHeight <= 0)
-                    return 0;
-
-                if (reference.TileCount > 0 && columns > 0)
-                    return Math.Max(1, (int)Math.Ceiling(reference.TileCount / (double)columns));
-
-                var denom = reference.TileHeight + reference.Spacing;
-                if (denom <= 0)
-                    return 0;
-
-                var usableHeight = atlasHeight - reference.Margin * 2 + reference.Spacing;
-                return Math.Max(1, usableHeight / denom);
-            }
-
-            private static SKBitmap CloneToSkBitmap(Bitmap bitmap)
-            {
-                using var ms = new MemoryStream();
-                bitmap.Save(ms);
-                ms.Position = 0;
-                return SKBitmap.Decode(ms);
-            }
-
-            private static SKBitmap LoadSkBitmap(TilesetReference reference)
-            {
-                if (!string.IsNullOrWhiteSpace(reference.AbsoluteTexturePath) && File.Exists(reference.AbsoluteTexturePath))
-                    return SKBitmap.Decode(reference.AbsoluteTexturePath);
-
-                if (!string.IsNullOrWhiteSpace(reference.TextureKey) && File.Exists(reference.TextureKey))
-                    return SKBitmap.Decode(reference.TextureKey);
-
-                var bitmap = Dotgame.Avalonia.Models.AssetManager.Instance.LoadBitmap(reference.TextureKey);
-                return CloneToSkBitmap(bitmap);
+                errorMessage = ex.Message;
+                return false;
             }
         }
+        // TileEntry moved to TileTypes.cs as a top-level type. EditorWindow now uses Dotgame.Avalonia.Views.TileEntry.
+
+        // LayerState moved to TileTypes.cs as a top-level type.
+
+        // TilesetState moved to TileTypes.cs as a top-level type.
 
         private sealed class MapLayerDto
         {
@@ -575,43 +310,26 @@ namespace Dotgame.Avalonia.Views
                     if (samples == null || samples.Count == 0)
                         continue;
 
-                    results.Add(ComputeSummary(pair.Key, samples));
+                    // compute simple statistics over the collected samples
+                    var name = pair.Key;
+                    var pendingAverage = samples.Average(s => (double)s.PendingJobs);
+                    var pendingPeak = samples.Max(s => s.PendingJobs);
+                    var activeAverage = samples.Average(s => (double)s.ActiveWorkers);
+                    var activePeak = samples.Max(s => s.ActiveWorkers);
+                    var last = samples[^1];
+
+                    results.Add(new TelemetryJobSummaryViewModel(
+                        name,
+                        samples.Count,
+                        pendingAverage,
+                        pendingPeak,
+                        activeAverage,
+                        activePeak,
+                        last.ConfiguredWorkers,
+                        last.CompletedJobs));
                 }
 
                 return results;
-            }
-
-            private static TelemetryJobSummaryViewModel ComputeSummary(string name, IReadOnlyList<RuntimeTelemetryRecorder.JobSystemTelemetrySample> samples)
-            {
-                double pendingSum = 0;
-                double activeSum = 0;
-                var pendingPeak = 0;
-                var activePeak = 0;
-
-                for (var i = 0; i < samples.Count; i++)
-                {
-                    var sample = samples[i];
-                    pendingSum += sample.PendingJobs;
-                    activeSum += sample.ActiveWorkers;
-                    if (sample.PendingJobs > pendingPeak)
-                        pendingPeak = sample.PendingJobs;
-                    if (sample.ActiveWorkers > activePeak)
-                        activePeak = sample.ActiveWorkers;
-                }
-
-                var pendingAverage = pendingSum / samples.Count;
-                var activeAverage = activeSum / samples.Count;
-                var last = samples[^1];
-
-                return new TelemetryJobSummaryViewModel(
-                    name,
-                    samples.Count,
-                    pendingAverage,
-                    pendingPeak,
-                    activeAverage,
-                    activePeak,
-                    last.ConfiguredWorkers,
-                    last.CompletedJobs);
             }
 
             private static string BuildSummary(TelemetryJobSystemSelection jobSystem, RuntimeTelemetryExport export)
@@ -626,7 +344,9 @@ namespace Dotgame.Avalonia.Views
             }
         }
 
-        private readonly List<TileEntry> tiles = new();
+    private readonly List<TileEntry> tiles = new();
+    private readonly ITileService _tileService;
+    private readonly DotGame.Core.Services.ITileService _coreTileService;
         private TileEntry? selectedTile;
         private Bitmap? spriteSheetImage;
         private string? spriteSheetPath;
@@ -696,6 +416,14 @@ namespace Dotgame.Avalonia.Views
         private ListBox? layerList;
     private ListBox? logList;
         private CheckBox? gridVisibilityCheck;
+        private CheckBox? passabilityOverlayCheck;
+
+    // Combined history service that handles tile and passability history
+    private DotGame.Core.CombinedHistoryService? history;
+
+        // Passability change types are provided by CombinedHistoryService to enable sharing between core and UI.
+
+        // TileChange and CompositeTileChange are provided by DotGame.Core.TileHistoryManager
     private ScrollViewer? viewportScroll;
     private TabControl? viewportTabControl;
     private RuntimePreviewHostControl? runtimePreviewHost;
@@ -818,6 +546,8 @@ namespace Dotgame.Avalonia.Views
         private StackPanel? DoodadsToolsPanel => this.FindControl<StackPanel>("DoodadsTools");
 
         private Map map;
+        // editor-side passability grid. Indexed as [x,y] to match ActiveTiles convention.
+        private bool[,]? editorPassability;
 
         private LayerState ActiveLayer
         {
@@ -840,10 +570,9 @@ namespace Dotgame.Avalonia.Views
 
         private bool InBounds(int x, int y)
         {
-            if (layers.Count == 0)
-                return false;
-
             var tiles = ActiveLayer.Tiles;
+            if (tiles == null)
+                return false;
             return x >= 0 && y >= 0 && x < tiles.GetLength(0) && y < tiles.GetLength(1);
         }
 
@@ -868,9 +597,8 @@ namespace Dotgame.Avalonia.Views
 
         private TileEntry?[,] CreateTileBuffer(int width, int height)
         {
-            width = Math.Max(1, width);
-            height = Math.Max(1, height);
-            return new TileEntry?[width, height];
+            var coreBuf = _coreTileService.CreateTileBuffer(width, height);
+            return ConvertCoreBufferToUi(coreBuf);
         }
 
         private TileEntry?[,] CreateTileBuffer(int size) => CreateTileBuffer(size, size);
@@ -943,27 +671,10 @@ namespace Dotgame.Avalonia.Views
 
         private TileEntry? GetTopmostTile(int x, int y, out LayerState? owningLayer)
         {
-            owningLayer = null;
-
-            for (int i = layers.Count - 1; i >= 0; i--)
-            {
-                var layer = layers[i];
-                if (!layer.IsVisible)
-                    continue;
-
-                var tiles = layer.Tiles;
-                if (x < 0 || y < 0 || x >= tiles.GetLength(0) || y >= tiles.GetLength(1))
-                    continue;
-
-                var entry = tiles[x, y];
-                if (entry != null)
-                {
-                    owningLayer = layer;
-                    return entry;
-                }
-            }
-
-            return null;
+            var layerObjs = layers.Cast<object>().ToList();
+            var core = _coreTileService.GetTopmostTile(layerObjs, x, y, out var coreOwning);
+            owningLayer = coreOwning as LayerState;
+            return ConvertCoreEntryToUi(core, map?.SourceDirectory ?? AppContext.BaseDirectory, activeTilesetState);
         }
 
         private TileEntry? GetTopmostTile(int x, int y) => GetTopmostTile(x, y, out _);
@@ -981,127 +692,20 @@ namespace Dotgame.Avalonia.Views
 
         private TileEntry? LoadTileEntry(string storedValue, string baseDirectory, TilesetState? tilesetState = null)
         {
-            if (string.IsNullOrWhiteSpace(storedValue))
-                return null;
-
-            if (tilesetState != null && int.TryParse(storedValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedId))
-            {
-                try
-                {
-                    return tilesetState.CreateTileEntry(parsedId);
-                }
-                catch (Exception ex)
-                {
-                    logger.Warn($"Failed to resolve tile id {parsedId} via tileset.", ex);
-                }
-            }
-
-            if (storedValue.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
-                return TileEntry.FromDataUrl(storedValue);
-
-            var resolved = IOPath.IsPathRooted(storedValue)
-                ? storedValue
-                : IOPath.Combine(baseDirectory, storedValue);
-
-            if (!System.IO.File.Exists(resolved))
-            {
-                logger.Warn($"Tile asset not found at {resolved}.");
-                return null;
-            }
-
-            try
-            {
-                return new TileEntry(new Bitmap(resolved), resolved, null, storedValue);
-            }
-            catch (Exception ex)
-            {
-                logger.Error($"Failed to load tile asset '{resolved}'.", ex);
-                return null;
-            }
+            var core = _coreTileService.LoadTileEntry(storedValue, baseDirectory, tilesetState, msg => PushHistory(msg));
+            return ConvertCoreEntryToUi(core, baseDirectory, tilesetState);
         }
 
         private TileEntry?[,] CreateTileBufferFromSerialized(JsonElement[][]? source, string baseDirectory, int fallbackCols, int fallbackRows, TilesetState? tilesetState)
         {
-            int height = Math.Max(1, source?.Length ?? fallbackRows);
-            int width = fallbackCols;
-
-            if (source != null && source.Length > 0)
-            {
-                width = source.Max(row => row?.Length ?? 0);
-            }
-
-            width = Math.Max(1, width);
-
-            var buffer = new TileEntry?[width, height];
-
-            if (source != null)
-            {
-                for (int y = 0; y < height; y++)
-                {
-                    var row = y < source.Length ? source[y] : null;
-                    for (int x = 0; x < width; x++)
-                    {
-                        if (row == null || x >= row.Length)
-                            continue;
-
-                        var element = row[x];
-                        if (element.ValueKind == JsonValueKind.Null || element.ValueKind == JsonValueKind.Undefined)
-                            continue;
-
-                        TileEntry? entry = null;
-                        switch (element.ValueKind)
-                        {
-                            case JsonValueKind.String:
-                                var stored = element.GetString();
-                                entry = string.IsNullOrWhiteSpace(stored)
-                                    ? null
-                                    : LoadTileEntry(stored!, baseDirectory, tilesetState);
-                                break;
-                            case JsonValueKind.Number:
-                                entry = CreateTileEntryFromNumber(element, tilesetState);
-                                break;
-                            default:
-                                logger.Warn($"Unsupported tile value '{element.ValueKind}' encountered during load.");
-                                break;
-                        }
-
-                        if (entry != null)
-                            buffer[x, y] = entry;
-                    }
-                }
-            }
-
-            return buffer;
+            var coreBuf = _coreTileService.CreateTileBufferFromSerialized(source, baseDirectory, fallbackCols, fallbackRows, tilesetState);
+            return ConvertCoreBufferToUi(coreBuf, baseDirectory, tilesetState);
         }
 
         private TileEntry? CreateTileEntryFromNumber(JsonElement element, TilesetState? tilesetState)
         {
-            if (tilesetState == null)
-            {
-                logger.Warn("Numeric tile encountered but no active tileset is available; skipping.");
-                return null;
-            }
-
-            int tileId;
-            if (element.TryGetInt32(out var intValue))
-            {
-                tileId = intValue;
-            }
-            else
-            {
-                var dbl = element.GetDouble();
-                tileId = (int)Math.Round(dbl);
-            }
-
-            try
-            {
-                return tilesetState.CreateTileEntry(tileId);
-            }
-            catch (Exception ex)
-            {
-                logger.Warn($"Failed to create tile entry for id {tileId}.", ex);
-                return null;
-            }
+            var core = _coreTileService.CreateTileEntryFromNumber(element, tilesetState);
+            return ConvertCoreEntryToUi(core, map?.SourceDirectory ?? AppContext.BaseDirectory, tilesetState);
         }
 
         private bool ShouldUseFallbackPreviewMap()
@@ -1114,23 +718,34 @@ namespace Dotgame.Avalonia.Views
 
         private bool EditorHasTilesPlaced()
         {
-            foreach (var layer in layers)
-            {
-                var buffer = layer.Tiles;
-                int width = buffer.GetLength(0);
-                int height = buffer.GetLength(1);
+            return _coreTileService.EditorHasTilesPlaced(layers.Cast<object>());
+        }
 
-                for (int x = 0; x < width; x++)
-                {
-                    for (int y = 0; y < height; y++)
-                    {
-                        if (buffer[x, y] != null)
-                            return true;
-                    }
-                }
-            }
+        private TileEntry? ConvertCoreEntryToUi(DotGame.Core.Services.CoreTileEntry? core, string? baseDirectory, TilesetState? tilesetState)
+        {
+            if (core == null)
+                return null;
 
-            return false;
+            var serialized = core.SerializedValue ?? (core.TileId?.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            if (serialized == null)
+                return null;
+
+            return _tileService.LoadTileEntry(serialized, baseDirectory ?? AppContext.BaseDirectory, tilesetState, msg => PushHistory(msg));
+        }
+
+        private TileEntry?[,] ConvertCoreBufferToUi(DotGame.Core.Services.CoreTileEntry?[,]? coreBuf, string? baseDirectory = null, TilesetState? tilesetState = null)
+        {
+            if (coreBuf == null)
+                return null!;
+
+            int w = coreBuf.GetLength(0);
+            int h = coreBuf.GetLength(1);
+            var outBuf = new TileEntry?[w, h];
+            for (int x = 0; x < w; x++)
+                for (int y = 0; y < h; y++)
+                    outBuf[x, y] = ConvertCoreEntryToUi(coreBuf[x, y], baseDirectory ?? AppContext.BaseDirectory, tilesetState);
+
+            return outBuf;
         }
 
         private bool TryLoadFallbackPreviewMap(out Map? fallbackMap)
@@ -1217,7 +832,14 @@ namespace Dotgame.Avalonia.Views
         }
 
 
+        // Parameterless ctor for XAML and codepaths that don't supply services.
         public EditorWindow()
+            : this(tileService: null)
+        {
+        }
+
+        // Allow tests or composition roots to inject a custom ITileService. If null, use the default implementation.
+        public EditorWindow(ITileService? tileService = null)
         {
             jobSystemActivation = RuntimeJobSystemFactory.CreateFromEnvironment();
             jobSystem = jobSystemActivation.JobSystem;
@@ -1231,6 +853,37 @@ namespace Dotgame.Avalonia.Views
             }
 
             scheduler = new AsyncTaskScheduler(workerCount: Math.Max(1, jobSystemActivation.WorkerCount), workerNamePrefix: "EditorWorker-");
+            if (tileService != null)
+                _tileService = tileService;
+            else
+            {
+                // Try resolve from the application service container; fallback to direct construction.
+                var resolved = DotGame.Core.Platform.ServiceContainer.Resolve<Dotgame.Avalonia.Services.ITileService>();
+                _tileService = resolved ?? new TileService();
+            }
+
+            // Ensure a core-facing ITileService is available. Prefer a registered core implementation,
+            // otherwise wrap the UI tile service with the adapter so core consumers get a concrete instance.
+            var coreResolved = DotGame.Core.Platform.ServiceContainer.Resolve<DotGame.Core.Services.ITileService>();
+            if (coreResolved != null)
+            {
+                _coreTileService = coreResolved;
+            }
+            else
+            {
+                // Create an adapter around the UI tile service and register it for future resolves.
+                var adapter = new Dotgame.Avalonia.Services.Adapters.TileServiceAdapter(_tileService);
+                try
+                {
+                    DotGame.Core.Platform.ServiceContainer.RegisterSingleton<DotGame.Core.Services.ITileService>(adapter);
+                }
+                catch
+                {
+                    // best-effort registration; ignore if registration fails
+                }
+
+                _coreTileService = adapter;
+            }
             resourceManager = new ResourceManager(scheduler);
             scheduler.UnhandledException += ex => Dispatcher.UIThread.Post(() => PushHistory($"Scheduler error: {ex.Message}"));
             PushHistory($"Job system active -> {jobSystemActivation.Resolved} (workers={jobSystemActivation.WorkerCount}).");
@@ -1261,12 +914,26 @@ namespace Dotgame.Avalonia.Views
             InitializeEditorUI();
             InitializeLoggingHooks();
             SyncMapFromEditorState();
+            UpdateUndoRedoButtonState();
         }
 
         protected override void OnOpened(EventArgs e)
         {
             base.OnOpened(e);
             InitializeRuntimePreview();
+
+            // Register an EditorWindow-backed preview service so core consumers
+            // can resolve and control the runtime preview via the canonical
+            // DotGame.Core.Services.IPreviewService contract.
+            try
+            {
+                var svc = new Dotgame.Avalonia.Services.EditorWindowPreviewService(this);
+                DotGame.Core.Platform.ServiceContainer.RegisterSingleton<DotGame.Core.Services.IPreviewService>(svc);
+            }
+            catch
+            {
+                // best-effort registration
+            }
         }
 
         private void InitializeComponent()
@@ -1295,6 +962,14 @@ namespace Dotgame.Avalonia.Views
             toolCollision = this.FindControl<ToggleButton>("ToolCollision");
             btnUndo = this.FindControl<Button>("BtnUndo");
             btnRedo = this.FindControl<Button>("BtnRedo");
+            if (btnUndo != null) btnUndo.Click += (_, _) =>
+            {
+                if (history != null && history.TileUndoCount > 0) UndoTiles(); else UndoPassability();
+            };
+            if (btnRedo != null) btnRedo.Click += (_, _) =>
+            {
+                if (history != null && history.TileRedoCount > 0) RedoTiles(); else RedoPassability();
+            };
             btnZoomOut = this.FindControl<Button>("BtnZoomOut");
             btnZoomReset = this.FindControl<Button>("BtnZoomReset");
             btnZoomIn = this.FindControl<Button>("BtnZoomIn");
@@ -1315,6 +990,7 @@ namespace Dotgame.Avalonia.Views
             doodadList = this.FindControl<ListBox>("DoodadList");
             triggerList = this.FindControl<ListBox>("TriggerList");
             gridVisibilityCheck = this.FindControl<CheckBox>("GridVisibilityCheck");
+            passabilityOverlayCheck = this.FindControl<CheckBox>("PassabilityOverlayCheck");
             viewportScroll = this.FindControl<ScrollViewer>("ViewportScroll");
             viewportTabControl = this.FindControl<TabControl>("ViewportTabControl");
             runtimePreviewHost = this.FindControl<RuntimePreviewHostControl>("RuntimePreviewHost");
@@ -1348,6 +1024,11 @@ namespace Dotgame.Avalonia.Views
             {
                 viewportTabControl.SelectionChanged += ViewportTabControl_SelectionChanged;
             }
+
+            // keyboard shortcuts for undo/redo
+            this.KeyDown += EditorWindow_KeyDown;
+            // Ensure undo/redo UI reflects current stacks
+            UpdateUndoRedoButtonState();
 
             HookToolToggle(toolBrush, EditorTool.Brush);
             HookToolToggle(toolEraser, EditorTool.Eraser);
@@ -1525,38 +1206,25 @@ namespace Dotgame.Avalonia.Views
 
             StopTabLayoutProfiling();
 
-            EditorGame? game;
-            lock (previewGameLock)
+            // Detach runtime preview host handlers now to avoid duplicate subscriptions
+            // if the preview is restarted during the window lifetime. Then stop the
+            // runtime preview and dispose resources.
+            try
             {
-                game = previewGame;
+                if (runtimePreviewHost != null)
+                {
+                    runtimePreviewHost.PointerPressed -= RuntimePreviewHost_PointerPressed;
+                    runtimePreviewHost.AttachedToVisualTree -= RuntimePreviewHost_AttachedToVisualTree;
+                    runtimePreviewHost.DetachedFromVisualTree -= RuntimePreviewHost_DetachedFromVisualTree;
+                }
             }
+            catch { /* best-effort */ }
 
-            game?.Exit();
-
-            if (viewportTabControl != null)
-            {
-                viewportTabControl.SelectionChanged -= ViewportTabControl_SelectionChanged;
-            }
-
-            if (runtimePreviewHost != null)
-            {
-                runtimePreviewHost.PointerPressed -= RuntimePreviewHost_PointerPressed;
-                runtimePreviewHost.AttachedToVisualTree -= RuntimePreviewHost_AttachedToVisualTree;
-                runtimePreviewHost.DetachedFromVisualTree -= RuntimePreviewHost_DetachedFromVisualTree;
-                runtimePreviewHost.Game = null;
-            }
-
-            runtimePreviewInitialized = false;
-
-            if (game != null)
-            {
-                game.Dispose();
-            }
-
-            lock (previewGameLock)
-            {
-                previewGame = null;
-            }
+            // Centralized shutdown of the runtime preview to avoid races when the
+            // host or game is torn down. This will null out the host.Game, call
+            // Exit/Dispose on the EditorGame instance if present, and clear the
+            // cached preview reference.
+            StopRuntimePreview();
 
             resourceManager.Dispose();
             scheduler.Dispose();
@@ -1871,6 +1539,10 @@ namespace Dotgame.Avalonia.Views
                 UpdateRuntimePreviewStatus($"Preview failed to initialize.\n{ex.Message}", true, true);
                 return;
             }
+            // If we are creating a fresh EditorGame, ensure any previous preview is
+            // cleanly stopped before replacing it. This avoids races where two
+            // EditorGame instances could be assigned to the host concurrently.
+            StopRuntimePreview();
 
             lock (previewGameLock)
             {
@@ -1883,6 +1555,15 @@ namespace Dotgame.Avalonia.Views
                 runtimePreviewInitialized = true;
                 UpdateRuntimePreviewStatus(string.Empty, false, false);
                 LogPreviewStatus("Runtime preview initialized with new EditorGame instance.");
+                try
+                {
+                    // Give the runtime host immediate focus so input is directed to the preview.
+                    runtimePreviewHost?.Focus();
+                }
+                catch
+                {
+                    // best-effort
+                }
             }
             catch (Exception ex)
             {
@@ -1890,6 +1571,7 @@ namespace Dotgame.Avalonia.Views
                 UpdateRuntimePreviewStatus($"Unable to start preview.\n{ex.Message}", true, true);
             }
         }
+
 
         private EditorGame CreateEditorPreviewGame(Map mapSnapshot)
         {
@@ -1970,6 +1652,181 @@ namespace Dotgame.Avalonia.Views
                 Dispatcher.UIThread.Post(Apply);
             }
         }
+
+        private void StopRuntimePreview()
+        {
+            // Safely stop and dispose the running preview game, and clear the host.Game
+            EditorGame? game;
+            lock (previewGameLock)
+            {
+                game = previewGame;
+            }
+
+            try
+            {
+                if (game != null)
+                {
+                    LogPreviewStatus("Stopping runtime preview: calling Exit on EditorGame.");
+                    try { game.Exit(); } catch { /* best-effort */ }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogPreviewStatus($"Exception while exiting preview game: {ex.Message}");
+            }
+
+            try
+            {
+                if (runtimePreviewHost != null)
+                {
+                    // Clear the Game assignment. Do not detach event handlers here; leave
+                    // handler lifecycle to the window Close path to avoid re-attaching on
+                    // preview restarts and causing duplicate subscriptions.
+                    runtimePreviewHost.Game = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogPreviewStatus($"Exception while clearing preview host: {ex.Message}");
+            }
+
+            runtimePreviewInitialized = false;
+
+            try
+            {
+                if (game != null)
+                {
+                    LogPreviewStatus("Disposing EditorGame instance.");
+                    try { game.Dispose(); } catch { /* best-effort */ }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogPreviewStatus($"Exception while disposing preview game: {ex.Message}");
+            }
+
+            lock (previewGameLock)
+            {
+                previewGame = null;
+            }
+        }
+
+        // Public wrappers so external UI services can control the preview without
+        // accessing internal/private methods directly.
+        public void StartPreview(string? mapSerialized = null)
+        {
+            // If no serialized map is provided, fall back to the existing
+            // initialization path which uses the editor's current `map` or
+            // the configured fallback preview map.
+            if (string.IsNullOrWhiteSpace(mapSerialized))
+            {
+                if (Dispatcher.UIThread.CheckAccess())
+                    InitializeRuntimePreview();
+                else
+                    Dispatcher.UIThread.Post(InitializeRuntimePreview);
+
+                return;
+            }
+
+            void StartWithSnapshot()
+            {
+                // Attempt to interpret the provided string as either a file
+                // path or raw JSON content. If we cannot produce a Map from
+                // the input, fall back to the normal initialization.
+                Map? snapshot = null;
+
+                try
+                {
+                    if (File.Exists(mapSerialized))
+                    {
+                        snapshot = Map.LoadFromJson(mapSerialized);
+                    }
+                    else
+                    {
+                        var trimmed = mapSerialized.TrimStart();
+                        if (trimmed.StartsWith("{") || trimmed.StartsWith("["))
+                        {
+                            // Parse JSON in-memory without touching the filesystem
+                            snapshot = Map.LoadFromJsonString(mapSerialized, AppContext.BaseDirectory);
+                        }
+                        else
+                        {
+                            // Not a path and not JSON; fall back to normal init
+                            InitializeRuntimePreview();
+                            return;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogPreviewStatus($"Failed to load preview map: {ex.Message}");
+                    // Fall back to the normal initialization path which will
+                    // display status overlays as appropriate.
+                    InitializeRuntimePreview();
+                    return;
+                }
+
+                if (snapshot == null)
+                {
+                    InitializeRuntimePreview();
+                    return;
+                }
+
+                // Ensure a clean preview state, create a fresh EditorGame for
+                // the provided snapshot and attach it to the preview host.
+                StopRuntimePreview();
+
+                EditorGame editorGame;
+                try
+                {
+                    editorGame = CreateEditorPreviewGame(snapshot);
+                }
+                catch (Exception ex)
+                {
+                    LogPreviewStatus($"Failed to create EditorGame for serialized map: {ex.Message}");
+                    UpdateRuntimePreviewStatus($"Preview failed to initialize.\n{ex.Message}", true, true);
+                    return;
+                }
+
+                lock (previewGameLock)
+                {
+                    previewGame = editorGame;
+                }
+
+                try
+                {
+                    if (runtimePreviewHost != null)
+                        runtimePreviewHost.Game = editorGame;
+                    runtimePreviewInitialized = true;
+                    try { runtimePreviewHost?.Focus(); } catch { }
+                }
+                catch (Exception ex)
+                {
+                    LogPreviewStatus($"Failed to assign EditorGame to host: {ex.Message}");
+                    UpdateRuntimePreviewStatus($"Unable to start preview.\n{ex.Message}", true, true);
+                }
+                
+            }
+
+            if (Dispatcher.UIThread.CheckAccess())
+                StartWithSnapshot();
+            else
+                Dispatcher.UIThread.Post(StartWithSnapshot);
+        }
+
+        public void StopPreview()
+        {
+            if (Dispatcher.UIThread.CheckAccess())
+            {
+                StopRuntimePreview();
+            }
+            else
+            {
+                Dispatcher.UIThread.Post(StopRuntimePreview);
+            }
+        }
+
+        public bool IsPreviewRunning => runtimePreviewInitialized;
 
         private void RuntimePreviewStatusDismissButton_Click(object? sender, RoutedEventArgs e)
         {
@@ -2403,6 +2260,20 @@ namespace Dotgame.Avalonia.Views
         {
             this.KeyDown += (sender, e) =>
             {
+                // If the runtime preview host has keyboard focus and there are no
+                // modifier keys, don't handle the key here so the MonoGame preview
+                // receives raw input (WASD, arrows, space, etc.). Allow Escape to
+                // still be handled by the editor to dismiss overlays.
+                try
+                {
+                    if (runtimePreviewHost?.IsFocused == true && e.KeyModifiers == KeyModifiers.None && e.Key != Key.Escape)
+                        return;
+                }
+                catch
+                {
+                    // best-effort; fall through if any issue checking focus
+                }
+
                 if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
                 {
                     switch (e.Key)
@@ -2669,7 +2540,7 @@ namespace Dotgame.Avalonia.Views
                 var filePath = result[0].Path.LocalPath;
                 try
                 {
-                    spriteSheetImage = new Bitmap(filePath);
+                    spriteSheetImage = Dotgame.Avalonia.Models.AssetManager.Instance.LoadBitmap(filePath);
                     spriteSheetPath = filePath;
                     activeTilesetState?.Dispose();
                     activeTilesetState = null;
@@ -2778,7 +2649,7 @@ namespace Dotgame.Avalonia.Views
                 foreach (var file in result)
                 {
                     var filePath = file.Path.LocalPath;
-                    var bitmap = new Bitmap(filePath);
+                    var bitmap = Dotgame.Avalonia.Models.AssetManager.Instance.LoadBitmap(filePath);
                     var entry = new TileEntry(bitmap, filePath);
                     tiles.Add(entry);
                     AddTileToPalette(entry);
@@ -3003,8 +2874,38 @@ namespace Dotgame.Avalonia.Views
                     tileset = tilesetPayload
                 };
 
+                // serialize editor passability (if present) as jagged bool[][] with [row][col]
+                bool[][]? passabilityPayload = null;
+                if (editorPassability != null)
+                {
+                    passabilityPayload = new bool[height][];
+                    for (int y = 0; y < height; y++)
+                    {
+                        passabilityPayload[y] = new bool[width];
+                        for (int x = 0; x < width; x++)
+                            passabilityPayload[y][x] = editorPassability[x, y];
+                    }
+                }
+
+                var fullMapObject = new
+                {
+                    cols = width,
+                    rows = height,
+                    tileW = tw,
+                    tileH = th,
+                    map = mapArray,
+                    layers = layersPayload,
+                    activeLayerIndex,
+                    characters = characterData,
+                    doodads = doodadData,
+                    triggers = triggerData,
+                    externalTileMapAsset = map.ExternalTileMapAsset,
+                    tileset = tilesetPayload,
+                    passability = passabilityPayload
+                };
+
                 var options = new JsonSerializerOptions { WriteIndented = true };
-                System.IO.File.WriteAllText(path, JsonSerializer.Serialize(mapObject, options));
+                System.IO.File.WriteAllText(path, JsonSerializer.Serialize(fullMapObject, options));
                 logger.Info($"Map saved to {path}.");
                 PushHistory($"Map saved to '{path}'.");
             }
@@ -3199,6 +3100,22 @@ namespace Dotgame.Avalonia.Views
             var mapPoint = GetMapPoint(e);
             UpdateStatusCursor(mapPoint);
             var properties = e.GetCurrentPoint(mapCanvas).Properties;
+            // Start a composite change when beginning a collision edit
+            if (currentMode == EditorMode.Tiles && currentTool == EditorTool.Collision)
+            {
+                history ??= new DotGame.Core.CombinedHistoryService();
+                history.BeginPassabilityComposite();
+            }
+            // Start a composite change for tile painting actions (brush/eraser/fill/rect/line/stamp)
+            if (currentMode == EditorMode.Tiles && currentTool != EditorTool.Collision)
+            {
+                try
+                {
+                    history ??= new DotGame.Core.CombinedHistoryService();
+                    history.BeginTileComposite();
+                }
+                catch { /* best-effort */ }
+            }
             PaintAtPosition(mapPoint, properties, isDrag: false);
         }
 
@@ -3222,6 +3139,34 @@ namespace Dotgame.Avalonia.Views
             isMouseDown = false;
             e.Pointer.Capture(null);
             SyncMapFromEditorState();
+            // End composite change and push to undo stack if any
+            if (currentMode == EditorMode.Tiles && currentTool == EditorTool.Collision)
+            {
+                try
+                {
+                    var composite = history?.EndPassabilityComposite();
+                    if (composite != null)
+                    {
+                        PushHistory($"Applied collision edits ({composite.Changes.Count} tiles)");
+                    }
+                    UpdateUndoRedoButtonState();
+                }
+                catch { /* best-effort */ }
+            }
+            // End composite tile change and commit to history manager
+            try
+            {
+                if (history != null)
+                {
+                    var composite = history.EndTileComposite();
+                    if (composite != null)
+                        PushHistory($"Applied tile edits ({composite.Changes.Count} tiles)");
+                    else
+                        PushHistory("Applied tile edits");
+                    UpdateUndoRedoButtonState();
+                }
+            }
+            catch { /* best-effort */ }
         }
 
         private void MapCanvas_PointerWheelChanged(object? sender, PointerWheelEventArgs e)
@@ -3243,6 +3188,31 @@ namespace Dotgame.Avalonia.Views
             UpdateStatusCursor(null);
         }
 
+        private void EditorWindow_KeyDown(object? sender, KeyEventArgs e)
+        {
+            // If the event was already handled by a focused control (e.g., a TextBox), skip it.
+            if (e.Handled)
+                return;
+
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.Z)
+            {
+                // Prefer tile undo if available, otherwise passability undo
+                if (history != null && history.TileUndoCount > 0)
+                    UndoTiles();
+                else
+                    UndoPassability();
+                e.Handled = true;
+            }
+            else if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.Y)
+            {
+                if (history != null && history.TileRedoCount > 0)
+                    RedoTiles();
+                else
+                    RedoPassability();
+                e.Handled = true;
+            }
+        }
+
         private void PaintAtPosition(Point mapPoint, PointerPointProperties properties, bool isDrag)
         {
             if (mapCanvas == null)
@@ -3253,8 +3223,22 @@ namespace Dotgame.Avalonia.Views
                 return;
 
             var (gridX, gridY) = gridCoords.Value;
-            bool erase = properties.IsRightButtonPressed || currentTool == EditorTool.Eraser;
-            bool primaryPressed = properties.IsLeftButtonPressed && !erase;
+                bool erase = properties.IsRightButtonPressed || currentTool == EditorTool.Eraser;
+                bool primaryPressed = properties.IsLeftButtonPressed && !erase;
+
+                // If collision tool is active and we're in tiles mode, toggle passability
+                if (currentMode == EditorMode.Tiles && currentTool == EditorTool.Collision)
+                {
+                    // Right-click to set passable/unset blocked, left-click to toggle
+                    if (erase)
+                        SetPassabilityAt(gridX, gridY, true);
+                    else if (primaryPressed)
+                        TogglePassabilityAt(gridX, gridY);
+
+                    RenderMap();
+                    SyncMapFromEditorState();
+                    return;
+                }
 
             switch (currentMode)
             {
@@ -3354,9 +3338,187 @@ namespace Dotgame.Avalonia.Views
                     if (x < 0 || y < 0 || x >= width || y >= height)
                         continue;
 
+                    // record previous serialized value
+                    string? oldSerialized = GetTopmostTile(x, y)?.GetSerializedValue();
+                    string? newSerialized = erase ? null : selectedTile!.GetSerializedValue();
+
                     tiles[x, y] = erase ? null : selectedTile!.Clone();
+
+                    try
+                    {
+                        history ??= new DotGame.Core.CombinedHistoryService();
+                        var tileChange = new DotGame.Core.TileHistoryManager.TileChange(x, y, oldSerialized, newSerialized);
+                        history.RecordTileChange(tileChange);
+                    }
+                    catch { /* best-effort */ }
                 }
             }
+        }
+
+        private void SetPassabilityAt(int x, int y, bool passable)
+        {
+            if (editorPassability == null)
+                return;
+            if (x < 0 || y < 0 || x >= editorPassability.GetLength(0) || y >= editorPassability.GetLength(1))
+                return;
+            var old = editorPassability[x, y];
+            if (old == passable)
+                return;
+            editorPassability[x, y] = passable;
+            var change = new DotGame.Core.CombinedHistoryService.PassabilityChange(x, y, old, passable);
+            history ??= new DotGame.Core.CombinedHistoryService();
+            history.RecordPassabilityChange(change);
+            UpdateUndoRedoButtonState();
+            // keep runtime map in sync so preview can use it
+            try
+            {
+                map?.GetType(); // no-op to avoid null issues
+            }
+            catch { }
+        }
+
+        private void TogglePassabilityAt(int x, int y)
+        {
+            if (editorPassability == null)
+                return;
+            if (x < 0 || y < 0 || x >= editorPassability.GetLength(0) || y >= editorPassability.GetLength(1))
+                return;
+            var old = editorPassability[x, y];
+            var nw = !old;
+            editorPassability[x, y] = nw;
+            var change = new DotGame.Core.CombinedHistoryService.PassabilityChange(x, y, old, nw);
+            history ??= new DotGame.Core.CombinedHistoryService();
+            history.RecordPassabilityChange(change);
+            UpdateUndoRedoButtonState();
+        }
+
+        private void UndoPassability()
+        {
+            if (history == null || history.UndoCount == 0)
+                return;
+            var entry = history.PopUndo();
+            if (editorPassability == null)
+                return;
+            if (entry is DotGame.Core.CombinedHistoryService.PassabilityChange single)
+            {
+                editorPassability[single.X, single.Y] = single.OldValue;
+                history.PushRedo(single);
+                PushHistory($"Undo collision at ({single.X},{single.Y}) -> {(single.OldValue ? "passable" : "blocked")}");
+            }
+            else if (entry is DotGame.Core.CombinedHistoryService.CompositePassabilityChange composite)
+            {
+                for (int i = composite.Changes.Count - 1; i >= 0; i--)
+                {
+                    var c = composite.Changes[i];
+                    editorPassability[c.X, c.Y] = c.OldValue;
+                }
+                history.PushRedo(composite);
+                PushHistory($"Undo collision edits ({composite.Changes.Count} tiles)");
+            }
+            RenderMap();
+            SyncMapFromEditorState();
+            UpdateUndoRedoButtonState();
+        }
+
+        private void RedoPassability()
+        {
+            if (history == null || history.RedoCount == 0)
+                return;
+            var entry = history.PopRedo();
+            if (editorPassability == null)
+                return;
+            if (entry is DotGame.Core.CombinedHistoryService.PassabilityChange single)
+            {
+                editorPassability[single.X, single.Y] = single.NewValue;
+                history.PushUndo(single);
+                PushHistory($"Redo collision at ({single.X},{single.Y}) -> {(single.NewValue ? "passable" : "blocked")}");
+            }
+            else if (entry is DotGame.Core.CombinedHistoryService.CompositePassabilityChange composite)
+            {
+                foreach (var c in composite.Changes)
+                    editorPassability[c.X, c.Y] = c.NewValue;
+                history.PushUndo(composite);
+                PushHistory($"Redo collision edits ({composite.Changes.Count} tiles)");
+            }
+            RenderMap();
+            SyncMapFromEditorState();
+            UpdateUndoRedoButtonState();
+        }
+
+        private void UpdateUndoRedoButtonState()
+        {
+            // enable if either passability or tile stacks have entries
+            if (btnUndo != null)
+                btnUndo.IsEnabled = history != null && history.UndoCount > 0;
+            if (btnRedo != null)
+                btnRedo.IsEnabled = history != null && history.RedoCount > 0;
+        }
+
+        private void UndoTiles()
+        {
+            if (history == null || history.TileUndoCount == 0)
+                return;
+            var entry = history.PopUndo();
+            if (entry is DotGame.Core.TileHistoryManager.TileChange single)
+            {
+                var tiles = ActiveTiles;
+                if (InBounds(single.X, single.Y))
+                {
+                    var restored = single.OldSerialized == null ? null : LoadTileEntry(single.OldSerialized!, map.SourceDirectory ?? AppContext.BaseDirectory, activeTilesetState);
+                    tiles[single.X, single.Y] = restored;
+                    history.PushRedo(single);
+                    PushHistory($"Undo tile at ({single.X},{single.Y})");
+                }
+            }
+            else if (entry is DotGame.Core.TileHistoryManager.CompositeTileChange composite)
+            {
+                var tiles = ActiveTiles;
+                for (int i = composite.Changes.Count - 1; i >= 0; i--)
+                {
+                    var c = composite.Changes[i];
+                    var restored = c.OldSerialized == null ? null : LoadTileEntry(c.OldSerialized!, map.SourceDirectory ?? AppContext.BaseDirectory, activeTilesetState);
+                    if (InBounds(c.X, c.Y))
+                        tiles[c.X, c.Y] = restored;
+                }
+                history.PushRedo(composite);
+                PushHistory($"Undo tile edits ({composite.Changes.Count} tiles)");
+            }
+            RenderMap();
+            SyncMapFromEditorState();
+            UpdateUndoRedoButtonState();
+        }
+
+        private void RedoTiles()
+        {
+            if (history == null || history.TileRedoCount == 0)
+                return;
+            var entry = history.PopRedo();
+            if (entry is DotGame.Core.TileHistoryManager.TileChange single)
+            {
+                var tiles = ActiveTiles;
+                if (InBounds(single.X, single.Y))
+                {
+                    var restored = single.NewSerialized == null ? null : LoadTileEntry(single.NewSerialized!, map.SourceDirectory ?? AppContext.BaseDirectory, activeTilesetState);
+                    tiles[single.X, single.Y] = restored;
+                    history.PushUndo(single);
+                    PushHistory($"Redo tile at ({single.X},{single.Y})");
+                }
+            }
+            else if (entry is DotGame.Core.TileHistoryManager.CompositeTileChange composite)
+            {
+                var tiles = ActiveTiles;
+                foreach (var c in composite.Changes)
+                {
+                    var restored = c.NewSerialized == null ? null : LoadTileEntry(c.NewSerialized!, map.SourceDirectory ?? AppContext.BaseDirectory, activeTilesetState);
+                    if (InBounds(c.X, c.Y))
+                        tiles[c.X, c.Y] = restored;
+                }
+                history.PushUndo(composite);
+                PushHistory($"Redo tile edits ({composite.Changes.Count} tiles)");
+            }
+            RenderMap();
+            SyncMapFromEditorState();
+            UpdateUndoRedoButtonState();
         }
 
         private void FloodFillTile(int startX, int startY)
@@ -3382,6 +3544,7 @@ namespace Dotgame.Avalonia.Views
             if (targetValue == replacementValue)
                 return;
 
+            try { history ??= new DotGame.Core.CombinedHistoryService(); history.BeginTileComposite(); } catch { }
             var queue = new Queue<(int x, int y)>();
             var visited = new bool[width, height];
             queue.Enqueue((startX, startY));
@@ -3400,13 +3563,32 @@ namespace Dotgame.Avalonia.Views
                 if (currentValue != targetValue)
                     continue;
 
+                var oldSerialized = currentValue;
                 tiles[x, y] = selectedTile.Clone();
+                var newSerialized = tiles[x, y]?.GetSerializedValue();
+                try
+                {
+                    var change = new DotGame.Core.TileHistoryManager.TileChange(x, y, oldSerialized, newSerialized);
+                        history?.RecordTileChange(change);
+                }
+                catch { }
 
                 queue.Enqueue((x + 1, y));
                 queue.Enqueue((x - 1, y));
                 queue.Enqueue((x, y + 1));
                 queue.Enqueue((x, y - 1));
             }
+
+            try
+            {
+                var composite = history?.EndTileComposite();
+                if (composite != null)
+                    PushHistory($"Filled area ({composite.Changes.Count} tiles)");
+                else
+                    PushHistory("Filled area");
+                UpdateUndoRedoButtonState();
+            }
+            catch { }
         }
 
         private void HandleCharacterPlacement(int tileX, int tileY, bool erase)
@@ -3938,17 +4120,39 @@ namespace Dotgame.Avalonia.Views
             int width = tiles.GetLength(0);
             int height = tiles.GetLength(1);
 
-            for (int x = 0; x < width; x++)
+            try
             {
-                for (int y = 0; y < height; y++)
-                    tiles[x, y] = selectedTile.Clone();
+                history ??= new DotGame.Core.CombinedHistoryService();
+                history.BeginTileComposite();
+                for (int x = 0; x < width; x++)
+                {
+                    for (int y = 0; y < height; y++)
+                    {
+                        var old = tiles[x, y]?.GetSerializedValue();
+                        tiles[x, y] = selectedTile.Clone();
+                        var nw = tiles[x, y]?.GetSerializedValue();
+                        var change = new DotGame.Core.TileHistoryManager.TileChange(x, y, old, nw);
+                        history.RecordTileChange(change);
+                    }
+                }
+                var composite = history.EndTileComposite();
+                RenderMap();
+                if (composite != null)
+                {
+                    var fillMessage = $"Filled the entire map with the current tile selection ({composite.Changes.Count} tiles).";
+                    logger.Info(fillMessage);
+                    PushHistory(fillMessage);
+                }
+                else
+                {
+                    const string fillMessage = "Filled the entire map with the current tile selection.";
+                    logger.Info(fillMessage);
+                    PushHistory(fillMessage);
+                }
+                SyncMapFromEditorState();
+                UpdateUndoRedoButtonState();
             }
-
-            RenderMap();
-            const string fillMessage = "Filled the entire map with the current tile selection.";
-            logger.Info(fillMessage);
-            PushHistory(fillMessage);
-            SyncMapFromEditorState();
+            catch { }
         }
 
         private async void BtnAddCharacter_Click(object? sender, RoutedEventArgs e)
@@ -4225,6 +4429,34 @@ namespace Dotgame.Avalonia.Views
                 }
             }
 
+            // Draw passability overlay (blocked tiles) on top
+            if (editorPassability != null && (passabilityOverlayCheck?.IsChecked ?? true))
+            {
+                int cols = Math.Min(width, editorPassability.GetLength(0));
+                int rows = Math.Min(height, editorPassability.GetLength(1));
+                var blockedBrush = new SolidColorBrush(Color.FromArgb(120, 255, 0, 0));
+                for (int x = 0; x < cols; x++)
+                {
+                    for (int y = 0; y < rows; y++)
+                    {
+                        // false = blocked, true = passable
+                        if (!editorPassability[x, y])
+                        {
+                            var overlay = new Rectangle
+                            {
+                                Width = currentCellSize,
+                                Height = currentCellSize,
+                                Fill = blockedBrush,
+                                Stroke = Brushes.Transparent
+                            };
+                            Canvas.SetLeft(overlay, x * currentCellSize);
+                            Canvas.SetTop(overlay, y * currentCellSize);
+                            mapCanvas.Children.Add(overlay);
+                        }
+                    }
+                }
+            }
+
             ApplyZoom();
         }
 
@@ -4266,6 +4498,37 @@ namespace Dotgame.Avalonia.Views
             var tilesetReference = activeTilesetState?.CreateReferenceForMap();
             map.InitializeFromArray(width, height, tileW, tileH, tilesSnapshot, characters, doodads, triggerSnapshot, map.ExternalTileMapAsset, tileIdSnapshot, tilesetReference, map.SourceDirectory);
 
+            // Ensure editor passability grid exists and matches dimensions. Default to all passable (true).
+            if (editorPassability == null || editorPassability.GetLength(0) != width || editorPassability.GetLength(1) != height)
+            {
+                editorPassability = new bool[width, height];
+                for (int x = 0; x < width; x++)
+                    for (int y = 0; y < height; y++)
+                        editorPassability[x, y] = true;
+            }
+
+            // Push editor passability into runtime map so preview reflects edits immediately.
+            try
+            {
+                if (editorPassability != null)
+                {
+                    // map.SetPassability expects [rows,cols] (y,x)
+                    var grid = new bool[height, width];
+                    for (int y = 0; y < height; y++)
+                    {
+                        for (int x = 0; x < width; x++)
+                        {
+                            grid[y, x] = editorPassability[x, y];
+                        }
+                    }
+                    map.SetPassability(grid);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Warn($"Failed to push passability to runtime preview: {ex.Message}");
+            }
+
             var fallbackStillRequired = ShouldUseFallbackPreviewMap();
             if (!fallbackStillRequired)
                 usingFallbackPreviewMap = false;
@@ -4274,6 +4537,7 @@ namespace Dotgame.Avalonia.Views
             {
                 NotifyPreviewMapUpdate();
             }
+            UpdateUndoRedoButtonState();
         }
 
         private void ToggleDiagnosticsPanel(bool? visible = null)
@@ -4309,6 +4573,7 @@ namespace Dotgame.Avalonia.Views
                     ["editor.layers"] = layers.Count.ToString(CultureInfo.InvariantCulture),
                     ["editor.jobSystem.active"] = jobSystemActivation.Resolved
                 };
+                    // no-op here
 
                 if (!string.IsNullOrWhiteSpace(map.SourceDirectory))
                     metadata["editor.map.sourceDirectory"] = map.SourceDirectory!;
@@ -4664,6 +4929,7 @@ namespace Dotgame.Avalonia.Views
         }
 
     }
-}
+
+    }
 
 
