@@ -2,10 +2,6 @@
 """Summarise telemetry exports produced by collect-job-system-telemetry.ps1."""
 
 from __future__ import annotations
-#!/usr/bin/env python3
-"""Summarise telemetry exports produced by collect-job-system-telemetry.ps1."""
-
-from __future__ import annotations
 
 import argparse
 import csv
