@@ -151,3 +151,49 @@ This project was originally created as LINQPad scripts (.linq files) and has bee
 
 The project structure and code organization was set up by Replit Agent. The original game logic remains as imported from the source repository.
 
+## Roadmap progress (2025-10-24)
+
+Summary of completed roadmap tasks and how to run/validate the changes:
+
+- Centralized domain into `DotGame.Core` and removed legacy UI-side copies of core domain types.
+- Introduced a core preview contract `DotGame.Core.Services.IPreviewService` so core code can request a runtime preview without referencing UI types.
+- Implemented UI adapters:
+  - `Dotgame.Avalonia.Services.Adapters.MonoGamePreviewAdapter` — a lightweight headless-friendly adapter used by tests.
+  - `Dotgame.Avalonia.Services.EditorWindowPreviewService` — an `EditorWindow`-backed adapter that marshals preview requests to the UI thread in the running application.
+- Added an in-memory map loader `Map.LoadFromJsonString` so previews can be started from raw JSON without touching the filesystem.
+- Fixed nullable-analysis warnings in `DotGame` UI code (e.g., `Map.cs`) to reduce CI noise.
+- Added unit tests to verify DI wiring and preview behavior (see `DotGame.Tests`):
+  - `PreviewDIWiringTests` — ensures `IPreviewService` can be registered and resolved.
+  - `PreviewServiceBehaviorTests` — exercises start/stop behavior using the headless `MonoGamePreviewAdapter`.
+  - `PreviewLifecycleTests2` — exercises editor-level preview map swap logic using the `EditorWindow` test hooks without launching the full UI.
+- CI improvements:
+  - Added a workflow step to run deterministic telemetry sweeps and a small analyzer that summarizes job-system telemetry exports.
+  - Added a CI lint rule to prevent files in the UI project from declaring `namespace DotGame.Core` (prevents accidental duplication of core domain in UI projects).
+
+How to run locally
+
+1. Build the solution (requires .NET 8 SDK):
+
+```powershell
+dotnet build leveleditor.sln --configuration Release
+```
+
+2. Run the unit tests (xUnit):
+
+```powershell
+dotnet test leveleditor.sln --configuration Release --no-build
+```
+
+3. Run the Avalonia app on Windows (helper script):
+
+```powershell
+#.\run-windows.ps1
+```
+
+Notes
+
+- The runtime preview can be requested from core code by resolving `DotGame.Core.Services.IPreviewService` from the `ServiceContainer` and calling `StartPreview(string? mapSerialized = null)`; the UI registers an adapter at startup so this works whether the application is running or in tests (tests use the headless adapter).
+- There is an optional follow-up to add an EditorWindow integration test that exercises the full EditorWindow-backed preview lifecycle in a CI-friendly way; current unit tests cover the core wiring and editor-level map-swap logic via test hooks.
+
+If you want, I can add that optional integration test next (it requires careful Avalonia headless setup), or I can open a short PR with the README changes only.
+
