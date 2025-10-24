@@ -113,3 +113,53 @@ Notes: unit tests include headless-friendly tests that initialize Avalonia's Ski
 
 This file is intended to be a concise snapshot of progress. The authoritative, machine-readable source of task state is the repository todo list (maintained during development). Update that list first and then refresh this document when the plan changes.
 
+---
+
+## Next 90 days (actionable)
+
+This section translates the current work plan into a focused, testable 90-day execution plan with owners, estimated milestones, and success criteria. Each item below is intentionally small and verifiable — when complete, convert it into issues/milestones in GitHub.
+
+1) Stabilize CI & expand test matrix — Owner: infra / core maintainer (week 0–3)
+   - Goal: Ensure solution builds and tests run on Windows and Linux in CI; add a minimal matrix for .NET 8 and .NET 7 compatibility if feasible.
+   - Deliverables: updated `.github/workflows/ci.yml` with matrix entries, passing runs for both OSes.
+   - Success criteria: CI green on both Windows and Ubuntu runners for the default test suite within 3 attempts.
+
+2) Finalize Core/Adapter contracts & reduce domain leakage — Owner: core maintainer (week 1–6)
+   - Goal: Remove remaining direct domain type references from UI projects; ensure all core services are referenced via interfaces in `DotGame.Core`.
+   - Deliverables: linter rule verification, PR to update any remaining references, small migration notes in `docs/`.
+   - Success criteria: No files in UI projects using `namespace DotGame.Core` per CI lint; tests covering preview startup/shutdown pass.
+
+3) Editor preview robustness & test coverage — Owner: runtime/editor dev (week 2–8)
+   - Goal: Increase test coverage around preview lifecycle, add edge tests for starting previews from JSON strings and concurrent start/stop calls.
+   - Deliverables: 4–6 new unit/integration tests added to `DotGame.Tests` and `DotGame.Core.Tests` covering startup, stop, and error conditions.
+   - Success criteria: Added tests pass locally and in CI; code paths for preview error handling exercised by tests.
+
+4) UX & Avalonia migration sprint — Owner: UI/UX dev (week 4–12)
+   - Goal: Convert the last 2–4 remaining Windows Forms dialogs to Avalonia and remove any platform-specific fallbacks.
+   - Deliverables: PR(s) converting dialogs, updated screenshots in `docs/`, and a short contributor note on registering adapters.
+   - Success criteria: All editor workflows exercised manually (start/stop preview, open/save map, tile editing) work on Avalonia without crashing.
+
+5) Asset & tile pipeline improvements — Owner: asset lead (week 6–12)
+   - Goal: Simplify creating/previewing maps and tiles in the editor and reduce friction for contributors adding assets.
+   - Deliverables: small CLI or script (`scripts/`) to validate tilesets, and documentation in `docs/` describing the asset layout.
+   - Success criteria: Contributors can add a tileset and run a validation script that returns pass/fail with actionable messages.
+
+6) Convert roadmap items to issues & set milestones — Owner: project lead (week 0–2)
+   - Goal: Create GitHub issues for the above items, assign owners, and set a 90-day milestone so progress is tracked in the issue tracker.
+   - Deliverables: issues created with checklists, milestone created for the 90-day plan.
+   - Success criteria: Each of the 1–5 items has an issue and the milestone is populated.
+
+Quick notes and assumptions
+--
+- Assumes maintainers have permissions to change GitHub workflows and create milestones.
+- If running matrix CI is too heavy, start with a single Ubuntu runner and expand after stability is confirmed.
+- Tests that depend on graphical components should prefer headless adapters or be ignored for headful runners.
+
+Next actions (recommended)
+- Convert each numbered item above into an issue and attach this section as an implementation note.
+- Triage the infra tasks first (CI + milestone creation) so contributors can rely on consistent validation.
+
+---
+
+Update history: 2025-10-24 — appended actionable 90-day plan.
+
