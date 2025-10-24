@@ -90,7 +90,12 @@ def summarise(samples: Iterable[JobSample]) -> Optional[Summary]:
 def discover_job_csvs(root: Path) -> Dict[str, Path]:
     outputs: Dict[str, Path] = {}
     for csv_path in root.rglob("*.csv"):
-        if csv_path.name.lower().endswith("job-systems.csv") or csv_path.stem.lower().startswith("job-system"):
+        # Support several naming conventions for job-system CSV exports. Historically
+        # we emitted files named like '*_jobs_<scheduler>.csv' and older runs used
+        # 'job-systems.csv' or 'job-system*' stems — accept any CSV whose stem
+        # contains 'job' or 'jobs' as a pragmatic match.
+        stem = csv_path.stem.lower()
+        if csv_path.name.lower().endswith("job-systems.csv") or stem.startswith("job-system") or "job" in stem:
             outputs[csv_path.parent.name] = csv_path
     return outputs
 

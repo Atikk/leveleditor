@@ -41,7 +41,7 @@ namespace Dotgame.Avalonia.Models
         public static Map LoadFromJson(string path)
         {
             var json = File.ReadAllText(path);
-            var obj = JsonSerializer.Deserialize<MapDto>(json, new JsonSerializerOptions
+            MapDto obj = JsonSerializer.Deserialize<MapDto>(json, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             }) ?? throw new InvalidDataException("Invalid map JSON.");
@@ -110,14 +110,15 @@ namespace Dotgame.Avalonia.Models
             // Load passability grid if present and dimensions match
             if (obj is not null)
             {
-                if (obj.passability != null && obj.passability.Length == obj.rows)
+                var passArr = obj.passability;
+                if (passArr != null && passArr.Length == obj.rows)
                 {
                     try
                     {
                         var pb = new bool[obj.rows, obj.cols];
                         for (int y = 0; y < obj.rows; y++)
                         {
-                            var row = obj.passability[y];
+                            var row = passArr[y];
                             if (row == null) continue;
                             for (int x = 0; x < Math.Min(obj.cols, row.Length); x++)
                             {
@@ -133,9 +134,10 @@ namespace Dotgame.Avalonia.Models
                 }
             }
 
-            if (obj.characters != null)
+            var chars = obj?.characters;
+            if (chars != null)
             {
-                foreach (var charDto in obj.characters!)
+                foreach (var charDto in chars)
                 {
                     var character = new Character(charDto.TileX, charDto.TileY, charDto.Class, charDto.Name)
                     {
@@ -157,9 +159,10 @@ namespace Dotgame.Avalonia.Models
                 }
             }
 
-            if (obj.doodads != null)
+            var doodadsArr = obj?.doodads;
+            if (doodadsArr != null)
             {
-                foreach (var doodadDto in obj.doodads!)
+                foreach (var doodadDto in doodadsArr)
                 {
                     var doodad = new Doodad(doodadDto.TileX, doodadDto.TileY, doodadDto.Type)
                     {
@@ -185,9 +188,10 @@ namespace Dotgame.Avalonia.Models
             }
 
             map.ExternalTileMapAsset = obj.externalTileMapAsset;
-            if (obj.triggers != null)
+            var triggersArr = obj?.triggers;
+            if (triggersArr != null)
             {
-                foreach (var triggerDto in obj.triggers!)
+                foreach (var triggerDto in triggersArr)
                 {
                     var trigger = new BehaviorTrigger
                     {
@@ -213,7 +217,7 @@ namespace Dotgame.Avalonia.Models
             if (string.IsNullOrWhiteSpace(json))
                 throw new ArgumentException("json must be non-empty", nameof(json));
 
-            var obj = JsonSerializer.Deserialize<MapDto>(json, new JsonSerializerOptions
+            MapDto obj = JsonSerializer.Deserialize<MapDto>(json, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             }) ?? throw new InvalidDataException("Invalid map JSON.");
@@ -281,14 +285,15 @@ namespace Dotgame.Avalonia.Models
             // Load passability grid if present and dimensions match
             if (obj is not null)
             {
-                if (obj.passability != null && obj.passability.Length == obj.rows)
+                var passArr = obj.passability;
+                if (passArr != null && passArr.Length == obj.rows)
                 {
                     try
                     {
                         var pb = new bool[obj.rows, obj.cols];
                         for (int y = 0; y < obj.rows; y++)
                         {
-                            var row = obj.passability[y];
+                            var row = passArr[y];
                             if (row == null) continue;
                             for (int x = 0; x < Math.Min(obj.cols, row.Length); x++)
                             {
