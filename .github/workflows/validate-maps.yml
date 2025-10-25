@@ -1,0 +1,42 @@
+name: Validate maps
+
+on:
+  push:
+    paths:
+      - 'maps/**'
+      - 'tools/MapPassabilityTool/**'
+      - '.github/workflows/validate-maps.yml'
+  pull_request:
+    paths:
+      - 'maps/**'
+      - 'tools/MapPassabilityTool/**'
+
+jobs:
+  validate-maps:
+    name: Validate map passability (dry-run)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Run MapPassabilityTool (dry-run)
+        run: |
+          dotnet run --project tools/MapPassabilityTool/MapPassabilityTool.csproj -- --maps-dir ./maps 2>&1 | tee validator_output.txt
+          if grep -q "MISSING" validator_output.txt; then
+            echo "Map validation failed: missing passability entries found.";
+            cat validator_output.txt;
+            exit 1;
+          fi
+          if grep -q "ERROR" validator_output.txt; then
+            echo "Map validation failed: tool reported errors.";
+            cat validator_output.txt;
+            exit 1;
+          fi

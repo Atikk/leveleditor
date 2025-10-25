@@ -124,5 +124,18 @@
       null,
       null
     ]
-  ]
+  ],
+  "camera": {
+    "position": [160.0, 160.0, 300.0],
+    "rotationQuaternion": {
+      "w": 0.9238795325112867,
+      "x": -0.3826834323650898,
+      "y": 0.0,
+      "z": 0.0
+    },
+    "projection": "perspective",
+    "fovDegrees": 60.0,
+    "near": 0.1,
+    "far": 2000.0
+  }
 }
