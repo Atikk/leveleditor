@@ -3,10 +3,6 @@
   "rows": 10,
   "tileW": 32,
   "tileH": 32,
-  "camera": {
-    "position": { "x": 0, "y": 0, "z": -100 },
-    "rotationQuaternion": { "w": 0.9238795, "x": -0.3826834, "y": 0.0, "z": 0.0 }
-  },
   "map": [
     [null, null, null, null, null, null, null, null, null, null],
     [null, null, null, null, null, null, null, null, null, null],

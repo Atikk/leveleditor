@@ -20,6 +20,9 @@ public class MapDocument
     // Optional passability grid: true = passable, false = blocked
     public bool[][]? Passability { get; set; }
 
+    // Optional camera metadata for previews (position and rotation quaternion)
+    public MapCamera? Camera { get; set; }
+
     public MapDocument()
     {
     }
